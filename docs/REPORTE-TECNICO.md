@@ -557,8 +557,16 @@ los datos realmente almacenados, no de una lista fija en el cliente.
   innecesarios, no por costumbre.
 - **Contexto en un módulo separado del proveedor**, para que la recarga en
   caliente de Vite funcione sin reiniciar el estado.
-- **Filtros aplicados al presionar "Buscar"**, no en cada pulsación de tecla: una
-  consulta por letra generaría peticiones que el usuario nunca llega a leer.
+- **Filtros de aplicación automática**: los desplegables consultan al
+  seleccionar y el campo de texto mientras se escribe. Para que escribir no
+  genere una petición por tecla, el hook `useDebouncedValue` propaga el texto a
+  la consulta tras 300 ms de inactividad; la tabla vigente se atenúa en lugar de
+  desaparecer, de modo que la pantalla no parpadea en cada pulsación.
+- **Filas de tabla activables con un clic**, que abren el formulario de edición.
+  El helper `buildClickableRowProps` ignora el clic cuando ocurre sobre un botón
+  de la fila o cuando en realidad es una selección de texto. La acción sigue
+  disponible en el botón de la fila, que es el control alcanzable con el teclado:
+  así no se agrega una parada de tabulación por cada registro de la tabla.
 - **Confirmación explícita** antes de toda eliminación.
 - **Accesibilidad**: `label` asociado a cada control, `aria-label` en los botones
   de icono, `role="dialog"` y cierre con Escape en las ventanas modales.

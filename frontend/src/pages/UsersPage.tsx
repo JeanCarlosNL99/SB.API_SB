@@ -11,6 +11,7 @@ import { ConfirmationDialog, Modal } from '@/components/Modal';
 import { useAuthentication } from '@/hooks/useAuthentication';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { formatDateTime } from '@/utils/formatters';
+import { buildClickableRowProps } from '@/utils/tableInteraction';
 import type { Role, User } from '@/types/api';
 
 const MINIMUM_PASSWORD_LENGTH = 8;
@@ -54,6 +55,20 @@ export function UsersPage() {
   function resetMessages() {
     setSuccessMessage(null);
     setOperationError(null);
+  }
+
+  /**
+   * Abre el formulario de edicion. Se extrae a una funcion porque la accion se
+   * dispara desde dos lugares: el boton de la fila y el clic sobre la fila.
+   */
+  function openEditor(user: User) {
+    resetMessages();
+    setUserBeingEdited(user);
+  }
+
+  function openDeleteConfirmation(user: User) {
+    resetMessages();
+    setUserBeingDeleted(user);
   }
 
   async function handleCreate(values: UserFormValues) {
@@ -173,7 +188,13 @@ export function UsersPage() {
                   </thead>
                   <tbody>
                     {usersQuery.data.map((user) => (
-                      <tr key={user.id}>
+                      <tr
+                        key={user.id}
+                        {...buildClickableRowProps(
+                          () => openEditor(user),
+                          `Editar ${user.userName}`,
+                        )}
+                      >
                         <td>{user.userName}</td>
                         <td>{user.fullName}</td>
                         <td>{user.email}</td>
@@ -205,10 +226,7 @@ export function UsersPage() {
                               className="button button--icon"
                               title="Editar"
                               aria-label={`Editar ${user.userName}`}
-                              onClick={() => {
-                                resetMessages();
-                                setUserBeingEdited(user);
-                              }}
+                              onClick={() => openEditor(user)}
                             >
                               <EditIcon />
                             </button>
@@ -222,10 +240,7 @@ export function UsersPage() {
                               }
                               aria-label={`Eliminar ${user.userName}`}
                               disabled={user.id === session?.userId}
-                              onClick={() => {
-                                resetMessages();
-                                setUserBeingDeleted(user);
-                              }}
+                              onClick={() => openDeleteConfirmation(user)}
                             >
                               <TrashIcon />
                             </button>

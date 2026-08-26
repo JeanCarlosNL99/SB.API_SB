@@ -22,7 +22,7 @@ GET {{baseUrl}}/api/autenticacion/sesion-actual
 Authorization: Bearer {{token}}
 
 ### Consultar entidades gubernamentales con filtros
-GET {{baseUrl}}/api/entidades-gubernamentales?name=Banco&pageNumber=1&pageSize=10
+GET {{baseUrl}}/api/entidades-gubernamentales?name=Instituto&pageNumber=1&pageSize=10
 Authorization: Bearer {{token}}
 
 ### Catalogos de categoria, sector y poder del Estado

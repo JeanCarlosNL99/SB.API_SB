@@ -3,6 +3,7 @@ import { payrollReportsApi } from '@/api/endpoints';
 import { EmptyState, ErrorMessage, LoadingIndicator } from '@/components/Feedback';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { buildClickableRowProps } from '@/utils/tableInteraction';
 import type { PayrollReportLine, WeeklyPayrollReport } from '@/types/api';
 
 /**
@@ -156,7 +157,14 @@ function PayrollRow({
 }) {
   return (
     <>
-      <tr>
+      <tr
+        {...buildClickableRowProps(
+          onToggle,
+          isExpanded
+            ? `Ocultar el calculo de ${line.fullName}`
+            : `Ver el calculo de ${line.fullName}`,
+        )}
+      >
         <td>{line.fullName}</td>
         <td>{line.socialSecurityNumber}</td>
         <td>

@@ -261,10 +261,10 @@ Obtener el token:
 curl -X POST http://localhost:5080/api/autenticacion/iniciar-sesion -H "Content-Type: application/json" -d "{\"userName\":\"administrador\",\"password\":\"Sb2024Admin\"}"
 ```
 
-Consultar entidades filtrando por nombre:
+Consultar entidades filtrando por nombre (41 de las 181 contienen "Instituto"):
 
 ```bash
-curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/entidades-gubernamentales?name=Banco&pageSize=5"
+curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/entidades-gubernamentales?name=Instituto&pageSize=5"
 ```
 
 Registrar un empleado por horas:

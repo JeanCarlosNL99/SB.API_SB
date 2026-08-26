@@ -454,6 +454,27 @@ table {
   background-color: rgba(237, 240, 247, 0.6);
 }
 
+/*
+ * Fila activable con un clic. El cursor y la franja de acento en el borde
+ * izquierdo anuncian que la fila completa es interactiva, no solo sus botones.
+ */
+.table__row--clickable {
+  cursor: pointer;
+}
+
+.table__row--clickable td:first-child {
+  box-shadow: inset 3px 0 0 0 transparent;
+  transition: box-shadow 120ms ease;
+}
+
+.table__row--clickable:hover td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--color-accent);
+}
+
+.table__row--clickable:active {
+  background-color: rgba(237, 240, 247, 0.95);
+}
+
 .table td--wrap {
   white-space: normal;
   min-width: 260px;
@@ -567,6 +588,28 @@ table {
   to {
     transform: rotate(360deg);
   }
+}
+
+/*
+ * Estado de recarga de una tabla que ya tiene datos en pantalla. Al filtrar
+ * mientras se escribe, sustituir la tabla por un indicador de carga produciria
+ * un parpadeo en cada pulsacion; en su lugar se atenua el contenido vigente y se
+ * bloquea la interaccion hasta que llega el nuevo resultado.
+ */
+.is-refreshing {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.filters__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  margin-top: var(--spacing-tight);
+  font-size: 12.5px;
+  color: var(--color-text-muted);
 }
 
 .pagination {

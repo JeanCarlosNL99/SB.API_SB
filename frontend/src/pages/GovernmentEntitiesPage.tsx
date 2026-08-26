@@ -12,7 +12,9 @@ import { ConfirmationDialog, Modal } from '@/components/Modal';
 import { Pagination } from '@/components/Pagination';
 import { useAuthentication } from '@/hooks/useAuthentication';
 import { useAsyncData } from '@/hooks/useAsyncData';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatDate } from '@/utils/formatters';
+import { buildClickableRowProps } from '@/utils/tableInteraction';
 import type {
   GovernmentEntity,
   GovernmentEntityFilter,
@@ -34,16 +36,15 @@ const INITIAL_FILTER: GovernmentEntityFilter = {
 /**
  * Consulta del mantenimiento de entidades gubernamentales.
  *
- * Los filtros se aplican al presionar "Buscar" y no en cada pulsacion de tecla:
- * una consulta por letra escrita generaria peticiones que el usuario nunca llega
- * a leer. El estado del formulario y el de la consulta se mantienen separados
- * para lograrlo.
+ * Los filtros se aplican de forma automatica: los desplegables al seleccionar y
+ * el campo de texto mientras se escribe. Para que escribir no genere una
+ * peticion por tecla, el valor del texto se propaga a la consulta con un retardo
+ * corto de inactividad.
  */
 export function GovernmentEntitiesPage() {
   const { canWriteMaintenance } = useAuthentication();
 
-  const [formFilter, setFormFilter] = useState<GovernmentEntityFilter>(INITIAL_FILTER);
-  const [appliedFilter, setAppliedFilter] = useState<GovernmentEntityFilter>(INITIAL_FILTER);
+  const [filter, setFilter] = useState<GovernmentEntityFilter>(INITIAL_FILTER);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [entityBeingEdited, setEntityBeingEdited] = useState<GovernmentEntity | null>(null);
   const [entityBeingDeleted, setEntityBeingDeleted] = useState<GovernmentEntity | null>(null);
@@ -52,27 +53,63 @@ export function GovernmentEntitiesPage() {
 
   const catalogsQuery = useAsyncData(() => governmentEntitiesApi.getCatalogs(), []);
 
+  // El campo de texto responde de inmediato en pantalla, pero la consulta se
+  // lanza cuando el usuario deja de escribir.
+  const debouncedName = useDebouncedValue(filter.name ?? '');
+
   const entitiesQuery = useAsyncData<PagedResponse<GovernmentEntity>>(
-    () => governmentEntitiesApi.search(appliedFilter),
+    () => governmentEntitiesApi.search({ ...filter, name: debouncedName }),
     [
-      appliedFilter.name,
-      appliedFilter.category,
-      appliedFilter.sector,
-      appliedFilter.stateBranch,
-      appliedFilter.status,
-      appliedFilter.pageNumber,
-      appliedFilter.pageSize,
+      debouncedName,
+      filter.category,
+      filter.sector,
+      filter.stateBranch,
+      filter.status,
+      filter.pageNumber,
+      filter.pageSize,
     ],
   );
 
-  const applyFilters = useCallback(() => {
-    setAppliedFilter({ ...formFilter, pageNumber: 1 });
-  }, [formFilter]);
+  /**
+   * Aplica un cambio de filtro y vuelve a la primera pagina: mantener la pagina
+   * anterior mostraria un resultado vacio cuando el nuevo filtro devuelve menos
+   * paginas que la actual.
+   */
+  const updateFilter = useCallback((changes: Partial<GovernmentEntityFilter>) => {
+    setFilter((previousFilter) => ({ ...previousFilter, ...changes, pageNumber: 1 }));
+  }, []);
 
   const clearFilters = useCallback(() => {
-    setFormFilter(INITIAL_FILTER);
-    setAppliedFilter(INITIAL_FILTER);
+    setFilter(INITIAL_FILTER);
   }, []);
+
+  const hasActiveFilters =
+    (filter.name ?? '') !== '' ||
+    (filter.category ?? '') !== '' ||
+    (filter.sector ?? '') !== '' ||
+    (filter.stateBranch ?? '') !== '' ||
+    (filter.status ?? '') !== '';
+
+  // Ya hay datos en pantalla y se esta trayendo un resultado nuevo: se atenua la
+  // tabla en lugar de sustituirla, para no parpadear en cada pulsacion.
+  const isRefreshing = entitiesQuery.isLoading && entitiesQuery.data !== null;
+  const isFirstLoad = entitiesQuery.isLoading && entitiesQuery.data === null;
+
+  /**
+   * Abre el formulario de edicion. Se extrae a una funcion porque la accion se
+   * dispara desde dos lugares: el boton de la fila y el clic sobre la fila.
+   */
+  function openEditor(entity: GovernmentEntity) {
+    setOperationError(null);
+    setSuccessMessage(null);
+    setEntityBeingEdited(entity);
+  }
+
+  function openDeleteConfirmation(entity: GovernmentEntity) {
+    setOperationError(null);
+    setSuccessMessage(null);
+    setEntityBeingDeleted(entity);
+  }
 
   async function handleUpdate(values: UpdateGovernmentEntityRequest) {
     if (!entityBeingEdited) {
@@ -123,9 +160,18 @@ export function GovernmentEntitiesPage() {
           <div>
             <h2 className="card__title">Filtros de consulta</h2>
             <p className="card__description">
-              Los filtros se combinan entre si y se aplican en el servidor.
+              Los filtros se combinan entre si, se aplican al instante y se resuelven en
+              el servidor.
             </p>
           </div>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+          >
+            Limpiar filtros
+          </button>
         </div>
 
         <div className="filters">
@@ -137,16 +183,10 @@ export function GovernmentEntitiesPage() {
               id="filterName"
               className="control"
               type="search"
-              placeholder="Ejemplo: Banco"
-              value={formFilter.name ?? ''}
-              onChange={(changeEvent) =>
-                setFormFilter({ ...formFilter, name: changeEvent.target.value })
-              }
-              onKeyDown={(keyboardEvent) => {
-                if (keyboardEvent.key === 'Enter') {
-                  applyFilters();
-                }
-              }}
+              placeholder="Escriba para filtrar"
+              autoComplete="off"
+              value={filter.name ?? ''}
+              onChange={(changeEvent) => updateFilter({ name: changeEvent.target.value })}
             />
           </div>
 
@@ -154,24 +194,24 @@ export function GovernmentEntitiesPage() {
             id="filterCategory"
             label="Categoria"
             options={catalogsQuery.data?.categories ?? []}
-            value={formFilter.category ?? ''}
-            onChange={(value) => setFormFilter({ ...formFilter, category: value })}
+            value={filter.category ?? ''}
+            onChange={(value) => updateFilter({ category: value })}
           />
 
           <SelectFilter
             id="filterSector"
             label="Sector"
             options={catalogsQuery.data?.sectors ?? []}
-            value={formFilter.sector ?? ''}
-            onChange={(value) => setFormFilter({ ...formFilter, sector: value })}
+            value={filter.sector ?? ''}
+            onChange={(value) => updateFilter({ sector: value })}
           />
 
           <SelectFilter
             id="filterStateBranch"
             label="Poder del Estado"
             options={catalogsQuery.data?.stateBranches ?? []}
-            value={formFilter.stateBranch ?? ''}
-            onChange={(value) => setFormFilter({ ...formFilter, stateBranch: value })}
+            value={filter.stateBranch ?? ''}
+            onChange={(value) => updateFilter({ stateBranch: value })}
           />
 
           <div className="field">
@@ -181,12 +221,9 @@ export function GovernmentEntitiesPage() {
             <select
               id="filterStatus"
               className="control"
-              value={formFilter.status ?? ''}
+              value={filter.status ?? ''}
               onChange={(changeEvent) =>
-                setFormFilter({
-                  ...formFilter,
-                  status: changeEvent.target.value as RecordStatus | '',
-                })
+                updateFilter({ status: changeEvent.target.value as RecordStatus | '' })
               }
             >
               <option value="">Todos</option>
@@ -194,15 +231,20 @@ export function GovernmentEntitiesPage() {
               <option value="Inactive">Inactivo</option>
             </select>
           </div>
+        </div>
 
-          <div className="pagination__controls">
-            <button type="button" className="button button--primary" onClick={applyFilters}>
-              Buscar
-            </button>
-            <button type="button" className="button button--secondary" onClick={clearFilters}>
-              Limpiar
-            </button>
-          </div>
+        <div className="filters__status" aria-live="polite">
+          {isRefreshing && (
+            <>
+              <span className="spinner" />
+              Filtrando...
+            </>
+          )}
+          {!entitiesQuery.isLoading && entitiesQuery.data && (
+            <>
+              {entitiesQuery.data.totalCount} entidad(es) coinciden con el filtro actual.
+            </>
+          )}
         </div>
       </section>
 
@@ -219,10 +261,10 @@ export function GovernmentEntitiesPage() {
         <SuccessMessage message={successMessage} />
         <ErrorMessage error={operationError ?? entitiesQuery.error} />
 
-        {entitiesQuery.isLoading && <LoadingIndicator />}
+        {isFirstLoad && <LoadingIndicator />}
 
-        {!entitiesQuery.isLoading && entitiesQuery.data && (
-          <>
+        {entitiesQuery.data && (
+          <div className={isRefreshing ? 'is-refreshing' : undefined}>
             {entitiesQuery.data.items.length === 0 ? (
               <EmptyState
                 title="No se encontraron entidades"
@@ -244,7 +286,15 @@ export function GovernmentEntitiesPage() {
                   </thead>
                   <tbody>
                     {entitiesQuery.data.items.map((entity) => (
-                      <tr key={entity.id}>
+                      <tr
+                        key={entity.id}
+                        {...(canWriteMaintenance
+                          ? buildClickableRowProps(
+                              () => openEditor(entity),
+                              `Editar ${entity.name}`,
+                            )
+                          : {})}
+                      >
                         <td className="table td--wrap">{entity.name}</td>
                         <td>{entity.category}</td>
                         <td>{entity.stateBranch}</td>
@@ -269,11 +319,7 @@ export function GovernmentEntitiesPage() {
                                 className="button button--icon"
                                 title="Editar"
                                 aria-label={`Editar ${entity.name}`}
-                                onClick={() => {
-                                  setOperationError(null);
-                                  setSuccessMessage(null);
-                                  setEntityBeingEdited(entity);
-                                }}
+                                onClick={() => openEditor(entity)}
                               >
                                 <EditIcon />
                               </button>
@@ -282,11 +328,7 @@ export function GovernmentEntitiesPage() {
                                 className="button button--icon"
                                 title="Eliminar"
                                 aria-label={`Eliminar ${entity.name}`}
-                                onClick={() => {
-                                  setOperationError(null);
-                                  setSuccessMessage(null);
-                                  setEntityBeingDeleted(entity);
-                                }}
+                                onClick={() => openDeleteConfirmation(entity)}
                               >
                                 <TrashIcon />
                               </button>
@@ -303,13 +345,11 @@ export function GovernmentEntitiesPage() {
             <Pagination
               page={entitiesQuery.data}
               onPageChange={(pageNumber) =>
-                setAppliedFilter({ ...appliedFilter, pageNumber })
+                setFilter((previousFilter) => ({ ...previousFilter, pageNumber }))
               }
-              onPageSizeChange={(pageSize) =>
-                setAppliedFilter({ ...appliedFilter, pageSize, pageNumber: 1 })
-              }
+              onPageSizeChange={(pageSize) => updateFilter({ pageSize })}
             />
-          </>
+          </div>
         )}
       </section>
 

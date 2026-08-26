@@ -13,7 +13,9 @@ import { ConfirmationDialog, Modal } from '@/components/Modal';
 import { Pagination } from '@/components/Pagination';
 import { useAuthentication } from '@/hooks/useAuthentication';
 import { useAsyncData } from '@/hooks/useAsyncData';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatCurrency, formatNumber, formatPercentage } from '@/utils/formatters';
+import { buildClickableRowProps } from '@/utils/tableInteraction';
 import type {
   Employee,
   EmployeeFilter,
@@ -39,8 +41,7 @@ const INITIAL_FILTER: EmployeeFilter = {
 export function EmployeesPage() {
   const { canWriteMaintenance } = useAuthentication();
 
-  const [formFilter, setFormFilter] = useState<EmployeeFilter>(INITIAL_FILTER);
-  const [appliedFilter, setAppliedFilter] = useState<EmployeeFilter>(INITIAL_FILTER);
+  const [filter, setFilter] = useState<EmployeeFilter>(INITIAL_FILTER);
 
   const [isCreating, setIsCreating] = useState(false);
   const [employeeBeingEdited, setEmployeeBeingEdited] = useState<Employee | null>(null);
@@ -53,26 +54,45 @@ export function EmployeesPage() {
 
   const departmentsQuery = useAsyncData(() => departmentsApi.getAll(), []);
 
+  // El campo de texto responde de inmediato en pantalla, pero la consulta se
+  // lanza cuando el usuario deja de escribir.
+  const debouncedName = useDebouncedValue(filter.name ?? '');
+
   const employeesQuery = useAsyncData<PagedResponse<Employee>>(
-    () => employeesApi.search(appliedFilter),
+    () => employeesApi.search({ ...filter, name: debouncedName }),
     [
-      appliedFilter.name,
-      appliedFilter.departmentId,
-      appliedFilter.status,
-      appliedFilter.type,
-      appliedFilter.pageNumber,
-      appliedFilter.pageSize,
+      debouncedName,
+      filter.departmentId,
+      filter.status,
+      filter.type,
+      filter.pageNumber,
+      filter.pageSize,
     ],
   );
 
-  const applyFilters = useCallback(() => {
-    setAppliedFilter({ ...formFilter, pageNumber: 1 });
-  }, [formFilter]);
+  /**
+   * Aplica un cambio de filtro y vuelve a la primera pagina: mantener la pagina
+   * anterior mostraria un resultado vacio cuando el nuevo filtro devuelve menos
+   * paginas que la actual.
+   */
+  const updateFilter = useCallback((changes: Partial<EmployeeFilter>) => {
+    setFilter((previousFilter) => ({ ...previousFilter, ...changes, pageNumber: 1 }));
+  }, []);
 
   const clearFilters = useCallback(() => {
-    setFormFilter(INITIAL_FILTER);
-    setAppliedFilter(INITIAL_FILTER);
+    setFilter(INITIAL_FILTER);
   }, []);
+
+  const hasActiveFilters =
+    (filter.name ?? '') !== '' ||
+    (filter.departmentId ?? '') !== '' ||
+    (filter.status ?? '') !== '' ||
+    (filter.type ?? '') !== '';
+
+  // Ya hay datos en pantalla y se esta trayendo un resultado nuevo: se atenua la
+  // tabla en lugar de sustituirla, para no parpadear en cada pulsacion.
+  const isRefreshing = employeesQuery.isLoading && employeesQuery.data !== null;
+  const isFirstLoad = employeesQuery.isLoading && employeesQuery.data === null;
 
   function resetMessages() {
     setSuccessMessage(null);
@@ -160,6 +180,31 @@ export function EmployeesPage() {
     }
   }
 
+  function openEditor(employee: Employee) {
+    resetMessages();
+    setEmployeeBeingEdited(employee);
+  }
+
+  function openDeleteConfirmation(employee: Employee) {
+    resetMessages();
+    setEmployeeBeingDeleted(employee);
+  }
+
+  /**
+   * Accion asociada al clic sobre una fila. Quien puede editar abre el
+   * formulario; quien solo tiene permiso de consulta abre el detalle del
+   * calculo, que es la accion equivalente disponible para su rol.
+   */
+  function activateRow(employee: Employee) {
+    if (canWriteMaintenance) {
+      openEditor(employee);
+
+      return;
+    }
+
+    void openDetail(employee);
+  }
+
   return (
     <>
       <section className="card">
@@ -167,21 +212,32 @@ export function EmployeesPage() {
           <div>
             <h2 className="card__title">Filtros de consulta</h2>
             <p className="card__description">
-              Busque por nombre o apellido, departamento, estado y tipo de contrato.
+              Busque por nombre o apellido, departamento, estado y tipo de contrato. Los
+              filtros se aplican al instante.
             </p>
           </div>
-          {canWriteMaintenance && (
+          <div className="pagination__controls">
             <button
               type="button"
-              className="button button--accent"
-              onClick={() => {
-                resetMessages();
-                setIsCreating(true);
-              }}
+              className="button button--secondary"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
             >
-              <PlusIcon size={16} /> Nuevo empleado
+              Limpiar filtros
             </button>
-          )}
+            {canWriteMaintenance && (
+              <button
+                type="button"
+                className="button button--accent"
+                onClick={() => {
+                  resetMessages();
+                  setIsCreating(true);
+                }}
+              >
+                <PlusIcon size={16} /> Nuevo empleado
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="filters">
@@ -193,15 +249,10 @@ export function EmployeesPage() {
               id="employeeName"
               className="control"
               type="search"
-              value={formFilter.name ?? ''}
-              onChange={(changeEvent) =>
-                setFormFilter({ ...formFilter, name: changeEvent.target.value })
-              }
-              onKeyDown={(keyboardEvent) => {
-                if (keyboardEvent.key === 'Enter') {
-                  applyFilters();
-                }
-              }}
+              placeholder="Escriba para filtrar"
+              autoComplete="off"
+              value={filter.name ?? ''}
+              onChange={(changeEvent) => updateFilter({ name: changeEvent.target.value })}
             />
           </div>
 
@@ -212,9 +263,9 @@ export function EmployeesPage() {
             <select
               id="employeeDepartment"
               className="control"
-              value={formFilter.departmentId ?? ''}
+              value={filter.departmentId ?? ''}
               onChange={(changeEvent) =>
-                setFormFilter({ ...formFilter, departmentId: changeEvent.target.value })
+                updateFilter({ departmentId: changeEvent.target.value })
               }
             >
               <option value="">Todos</option>
@@ -233,12 +284,9 @@ export function EmployeesPage() {
             <select
               id="employeeStatusFilter"
               className="control"
-              value={formFilter.status ?? ''}
+              value={filter.status ?? ''}
               onChange={(changeEvent) =>
-                setFormFilter({
-                  ...formFilter,
-                  status: changeEvent.target.value as EmployeeStatus | '',
-                })
+                updateFilter({ status: changeEvent.target.value as EmployeeStatus | '' })
               }
             >
               <option value="">Todos</option>
@@ -254,12 +302,9 @@ export function EmployeesPage() {
             <select
               id="employeeTypeFilter"
               className="control"
-              value={formFilter.type ?? ''}
+              value={filter.type ?? ''}
               onChange={(changeEvent) =>
-                setFormFilter({
-                  ...formFilter,
-                  type: changeEvent.target.value as EmployeeType | '',
-                })
+                updateFilter({ type: changeEvent.target.value as EmployeeType | '' })
               }
             >
               <option value="">Todos</option>
@@ -271,14 +316,18 @@ export function EmployeesPage() {
             </select>
           </div>
 
-          <div className="pagination__controls">
-            <button type="button" className="button button--primary" onClick={applyFilters}>
-              Buscar
-            </button>
-            <button type="button" className="button button--secondary" onClick={clearFilters}>
-              Limpiar
-            </button>
-          </div>
+        </div>
+
+        <div className="filters__status" aria-live="polite">
+          {isRefreshing && (
+            <>
+              <span className="spinner" />
+              Filtrando...
+            </>
+          )}
+          {!employeesQuery.isLoading && employeesQuery.data && (
+            <>{employeesQuery.data.totalCount} empleado(s) coinciden con el filtro actual.</>
+          )}
         </div>
       </section>
 
@@ -295,10 +344,10 @@ export function EmployeesPage() {
         <SuccessMessage message={successMessage} />
         <ErrorMessage error={operationError ?? employeesQuery.error} />
 
-        {employeesQuery.isLoading && <LoadingIndicator />}
+        {isFirstLoad && <LoadingIndicator />}
 
-        {!employeesQuery.isLoading && employeesQuery.data && (
-          <>
+        {employeesQuery.data && (
+          <div className={isRefreshing ? 'is-refreshing' : undefined}>
             {employeesQuery.data.items.length === 0 ? (
               <EmptyState
                 title="No se encontraron empleados"
@@ -320,7 +369,15 @@ export function EmployeesPage() {
                   </thead>
                   <tbody>
                     {employeesQuery.data.items.map((employee) => (
-                      <tr key={employee.id}>
+                      <tr
+                        key={employee.id}
+                        {...buildClickableRowProps(
+                          () => activateRow(employee),
+                          canWriteMaintenance
+                            ? `Editar ${employee.fullName}`
+                            : `Ver detalle de ${employee.fullName}`,
+                        )}
+                      >
                         <td>{employee.fullName}</td>
                         <td>{employee.socialSecurityNumber}</td>
                         <td>
@@ -361,10 +418,7 @@ export function EmployeesPage() {
                                   className="button button--icon"
                                   title="Editar"
                                   aria-label={`Editar ${employee.fullName}`}
-                                  onClick={() => {
-                                    resetMessages();
-                                    setEmployeeBeingEdited(employee);
-                                  }}
+                                  onClick={() => openEditor(employee)}
                                 >
                                   <EditIcon />
                                 </button>
@@ -373,10 +427,7 @@ export function EmployeesPage() {
                                   className="button button--icon"
                                   title="Eliminar"
                                   aria-label={`Eliminar ${employee.fullName}`}
-                                  onClick={() => {
-                                    resetMessages();
-                                    setEmployeeBeingDeleted(employee);
-                                  }}
+                                  onClick={() => openDeleteConfirmation(employee)}
                                 >
                                   <TrashIcon />
                                 </button>
@@ -394,13 +445,11 @@ export function EmployeesPage() {
             <Pagination
               page={employeesQuery.data}
               onPageChange={(pageNumber) =>
-                setAppliedFilter({ ...appliedFilter, pageNumber })
+                setFilter((previousFilter) => ({ ...previousFilter, pageNumber }))
               }
-              onPageSizeChange={(pageSize) =>
-                setAppliedFilter({ ...appliedFilter, pageSize, pageNumber: 1 })
-              }
+              onPageSizeChange={(pageSize) => updateFilter({ pageSize })}
             />
-          </>
+          </div>
         )}
       </section>
 
