@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    Propiedades comunes a todas las capas de la solucion.
+    Centralizarlas evita duplicacion y garantiza que todas las capas
+    compilen contra la misma version del framework (.NET 8).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,53 @@
+## ---------------------------------------------------------------------------
+## .NET
+## ---------------------------------------------------------------------------
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+.idea/
+artifacts/
+TestResults/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+## ---------------------------------------------------------------------------
+## Node y frontend
+## ---------------------------------------------------------------------------
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+.eslintcache
+
+## ---------------------------------------------------------------------------
+## Datos generados en tiempo de ejecucion
+## ---------------------------------------------------------------------------
+## La base de datos de texto plano se genera en el primer arranque a partir de
+## GovernmentEntities.seed.txt, que si esta versionado. Se excluye el archivo
+## generado para que los datos capturados durante las pruebas de cada
+## desarrollador no entren al control de versiones.
+src/SB.API_SB.Presentation/Database/GovernmentEntities.txt
+src/SB.API_SB.Presentation/Database/GovernmentEntities.txt.tmp
+src/SB.API_SB.Presentation/Database/Backups/
+
+## Base de datos SQLite de desarrollo y registros de la aplicacion.
+*.db
+*.db-shm
+*.db-wal
+src/SB.API_SB.Presentation/Logs/
+
+## ---------------------------------------------------------------------------
+## Secretos locales
+## ---------------------------------------------------------------------------
+appsettings.Local.json
+*.pfx
+.env
+.env.local

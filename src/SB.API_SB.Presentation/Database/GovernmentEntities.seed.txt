@@ -1,0 +1,186 @@
+# SB.API_SB - Archivo semilla del mantenimiento de Entidades Gubernamentales
+# Fuente: ListaEntidadesGubernamentales.xlsx (listado oficial entregado con la prueba tecnica)
+# Campos: Nombre|Categoria|PoderDelEstado|Sector
+# Este archivo es la fuente de verdad legible. Al iniciar la API por primera vez se
+# genera GovernmentEntities.txt con identificadores, estado y datos de auditoria.
+Acuario Nacional|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Administración General del Parque Nacional Mirador Norte|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Archivo General de la Nación|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Cultura
+Autoridad Nacional de Asuntos Marítimos|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Autoridad Portuaria Dominicana|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Obras Públicas y Comunicaciones
+Biblioteca Nacional Pedro Henríquez Ureña|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Cultura
+Centro de Atención Integral para la Discapacidad|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Centro de Desarrollo y Competitividad Industrial|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Centro de Operaciones de Emergencias|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Comisión de Fomento a la Tecnificación del Sistema Nacional de Riego|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Agricultura
+Comisión Nacional de Defensa de la Competencia|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Comisión Nacional de Energía|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Energía y Minas
+Comisión Presidencial de Apoyo al Desarrollo Barrial|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Social
+Comisión Reguladora de Prácticas Desleales en el Comercio y Medidas de Salvaguardas|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Comité Ejecutor de Infraestructuras de Zonas Turísticas|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Turismo
+Consejo de Coordinación de la Zona Especial de Desarrollo Fronterizo|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Consejo Dominicano de Pesca y Acuicultura|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Consejo Nacional de Competitividad|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Presidencia
+Consejo Nacional de Discapacidad|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Presidencia
+Consejo Nacional de Drogas|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Presidencia
+Consejo Nacional de Fronteras|Órgano Colegiado|Poder Ejecutivo|Relaciones Exteriores
+Consejo Nacional de Investigaciones Agropecuarias y Forestales|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Consejo Nacional de la Persona Envejeciente|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Salud
+Consejo Nacional de Producción Pecuaria|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Agricultura
+Consejo Nacional de Promoción y Apoyo a la Micro, Pequeña y Mediana Empresa|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Consejo Nacional de Seguridad Social|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Trabajo
+Consejo Nacional de Zonas Francas de Exportación|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Consejo Nacional para el Cambio Climático y Mercado de Carbono|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Presidencia
+Consejo Nacional para el VIH y el SIDA|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Consejo Nacional para la Niñez y la Adolescencia|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Presidencia
+Consejo Nacional para la Reglamentación y Fomento de la Industria Lechera|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Agricultura
+Consejo Provincial para la Administración de los Fondos Mineros Sánchez Ramírez|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Economía, Planificación y Desarrollo
+Consultoría Jurídica del Poder Ejecutivo|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Contraloría General de la República|Ministerio|Poder Ejecutivo|Control Interno
+Corporación de Fomento de la Industria Hotelera y Desarrollo del Turismo|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Turismo
+Corporación del Acueducto y Alcantarillado de Boca Chica|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de la Romana|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de la Vega|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de Moca|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de Monseñor Nouel|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de Puerto Plata|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de Santiago|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación del Acueducto y Alcantarillado de Santo Domingo|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Corporación Estatal de Radio y Televisión|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Cultura
+Cuerpo Especializado de Control de Combustibles|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Defensa
+Departamento Aeroportuario|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Obras Públicas y Comunicaciones
+Dirección de Asistencia Social y Alimentación Comunitaria|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Social
+Dirección de Desarrollo Provincial|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Social
+Dirección de Desarrollo Social Supérate|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Social
+Dirección de Estrategia y Comunicación Gubernamental|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección de Infraestructura Escolar|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Dirección de Prensa del Presidente de la República|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección del Comisionado Nacional de Beisbol|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Deportes y Recreación
+Dirección Ejecutiva del Sistema Nacional de Atención a Emergencias y Seguridad 9-1-1|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección General de Aduanas|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Alianzas Público Privadas|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección General de Bellas Artes|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Cultura
+Dirección General de Bienes Nacionales|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Catastro Nacional|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Cine|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Cultura
+Dirección General de Contabilidad Gubernamental|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Contrataciones Públicas|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Desarrollo de la Comunidad|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Social
+Dirección General de Desarrollo Fronterizo|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección General de Embellecimiento de Carreteras y Avenidas de Circunvalación del País|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Obras Públicas y Comunicaciones
+Dirección General de Ética e Integridad Gubernamental|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección General de Ganadería|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Agricultura
+Dirección General de Impuestos Internos|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Información y Defensa de los Afiliados a la Seguridad Social|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Trabajo
+Dirección General de Jubilaciones y Pensiones a Cargo del Estado|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de la Policía Nacional|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Interior y Policía
+Dirección General de Mecenazgo|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Cultura
+Dirección General de Medicamentos, Alimentos y Productos Sanitarios|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Salud
+Dirección General de Migración|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Interior y Policía
+Dirección General de Minería|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Energía y Minas
+Dirección General de Museos|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Cultura
+Dirección General de Pasaportes|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Relaciones Exteriores
+Dirección General de Persecución del Ministerio Público|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Justicia
+Dirección General de Presupuesto|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Dirección General de Proyectos Estratégicos y Especiales de la Presidencia|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Dirección General de Riesgos Agropecuarios|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Dirección General de Servicios Penitenciarios y Correccionales|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Justicia
+Dirección Nacional de Control de Drogas|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Empresa Metropolitana de Transporte, (EMT). S.A.|Empresa Pública|Poder Ejecutivo|Presidencia
+Fondo de Pensiones y Jubilaciones de los Trabajadores de la Construcción|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Trabajo
+Fondo Especial para el Desarrollo Agropecuario|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Agricultura
+Fondo Nacional para el Medio Ambiente y Recursos Naturales|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Gabinete de Coordinación de Política Social|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Social
+Industria Nacional de la Aguja|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Instituto Agrario Dominicano|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto Azucarero Dominicano|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto de Auxilios|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Social
+Instituto de Desarrollo y Crédito Cooperativo|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto de Educación Superior en Formación Diplomática y Consular “Dr. Eduardo Latorre Rodríguez”|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Instituto de Estabilización de Precios|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto de Formación Turística del Caribe|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Turismo
+Instituto de Innovación en Biotecnología e Industria|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Instituto del Tabaco de la República Dominicana|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto Dominicano de Aviación Civil|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Presidencia
+Instituto Dominicano de Evaluación e Investigación de la Calidad Educativa|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Instituto Dominicano de Investigaciones Agropecuarias y Forestales|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto Dominicano de las Telecomunicaciones|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Presidencia
+Instituto Dominicano de Meteorología|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Instituto Dominicano de Prevención y Protección de Riesgos Laborales|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Trabajo
+Instituto Dominicano del Café|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto Dominicano para la Calidad|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Instituto Duartiano|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Cultura
+Instituto Geográfico Nacional José Joaquín Hungría Morell|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Economía, Planificación y Desarrollo
+Instituto Nacional de Administración Pública|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Administración Pública
+Instituto Nacional de Aguas Potables y Alcantarillados|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Instituto Nacional de Atención Integral a la Primera Infancia|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Educación
+Instituto Nacional de Bienestar Estudiantil|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Instituto Nacional de Bienestar Magisterial|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Instituto Nacional de Ciencias Forenses|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Justicia
+Instituto Nacional de Coordinación de Trasplante|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Instituto Nacional de Custodia y Administración de Bienes Incautados, Decomisados y en Extinción de Dominio|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Hacienda
+Instituto Nacional de Educación Física|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Instituto Nacional de Formación Técnico Profesional|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Trabajo
+Instituto Nacional de Formación y Capacitación del Magisterio|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación
+Instituto Nacional de la Uva|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Instituto Nacional de Migración|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Interior y Policía
+Instituto Nacional de Protección de los Derechos del Consumidor|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Instituto Nacional de Recursos Hidráulicos|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Instituto Nacional de Tránsito y Transporte Terrestre|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Obras Públicas y Comunicaciones
+Instituto para el Desarrollo del Suroeste|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Economía, Planificación y Desarrollo
+Instituto Postal Dominicano|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Obras Públicas y Comunicaciones
+Instituto Superior de Formación Docente Salomé Ureña|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Instituto Superior Especializado de Estudios Penitenciario y Correccionales|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Justicia
+Instituto Técnico Superior Comunitario|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Instituto Tecnológico de las Américas|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Jardín Botánico Nacional "Dr. Rafael M. Moscoso"|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Junta de Aviación Civil|Órgano Colegiado con Estructura Operativa|Poder Ejecutivo|Presidencia
+Liga Municipal Dominicana|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Interior y Policía
+Lotería Nacional|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Mercados Dominicanos de Abasto Agropecuario|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Agricultura
+Ministerio Administrativo de la Presidencia|Ministerio|Poder Ejecutivo|Presidencia
+Ministerio de Administración Pública|Ministerio|Poder Ejecutivo|Administración Pública
+Ministerio de Agricultura|Ministerio|Poder Ejecutivo|Agricultura
+Ministerio de Cultura|Ministerio|Poder Ejecutivo|Cultura
+Ministerio de Defensa|Ministerio|Poder Ejecutivo|Defensa
+Ministerio de Deportes y Recreación|Ministerio|Poder Ejecutivo|Deportes y Recreación
+Ministerio de Educación|Ministerio|Poder Ejecutivo|Educación
+Ministerio de Educación Superior, Ciencia y Tecnología|Ministerio|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Ministerio de Energía y Minas|Ministerio|Poder Ejecutivo|Energía y Minas
+Ministerio de Hacienda y Economía|Ministerio|Poder Ejecutivo|Hacienda
+Ministerio de Industria, Comercio y Mipymes|Ministerio|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Ministerio de Interior y Policía|Ministerio|Poder Ejecutivo|Interior y Policía
+Ministerio de la Juventud|Ministerio|Poder Ejecutivo|Juventud
+Ministerio de la Mujer|Ministerio|Poder Ejecutivo|Mujer
+Ministerio de la Presidencia|Ministerio|Poder Ejecutivo|Presidencia
+Ministerio de la Vivienda, Hábitat y Edificaciones|Ministerio|Poder Ejecutivo|Vivienda, Hábitat y Edificaciones
+Ministerio de Medio Ambiente y Recursos Naturales|Ministerio|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Ministerio de Obras Públicas y Comunicaciones|Ministerio|Poder Ejecutivo|Obras Públicas y Comunicaciones
+Ministerio de Relaciones Exteriores|Ministerio|Poder Ejecutivo|Relaciones Exteriores
+Ministerio de Salud Pública y Asistencia Social|Ministerio|Poder Ejecutivo|Salud
+Ministerio de Trabajo|Ministerio|Poder Ejecutivo|Trabajo
+Ministerio de Turismo|Ministerio|Poder Ejecutivo|Turismo
+Ministerio Público|Ministerio|Poder Ejecutivo|Justicia
+Museo Nacional de Historia Natural "Prof. Eugenio de Jesús Marcano"|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Oficina de la Defensa Civil|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Oficina Gubernamental de Tecnologías de la Información y Comunicación|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Administración Pública
+Oficina Nacional de Derecho de Autor|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Oficina Nacional de Estadística|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Economía, Planificación y Desarrollo
+Oficina Nacional de Evaluación Sísmica y Vulnerabilidad de Infraestructura y Edificaciones|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Presidencia
+Oficina Nacional de la Propiedad Industrial|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Organismo Dominicano de Acreditación|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Industria, Comercio y MIPYMES
+Parque Zoológico Nacional Arq. Manuel Valverde Podesta|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales
+Programa de Medicamentos Esenciales/Central de Apoyo Logístico|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Salud
+Servicio Geológico Nacional|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Energía y Minas
+Servicio Nacional de Salud|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Salud
+Sistema Único de Beneficiarios|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Social
+Superintendencia de Salud y Riesgos Laborales|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Trabajo
+Superintendencia de Seguros|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Hacienda
+Superintendencia del Mercado de Valores|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Hacienda
+Tesorería de la Seguridad Social|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Trabajo
+Tesorería Nacional|Organismo Desconcentrado Funcionalmente|Poder Ejecutivo|Hacienda
+Unidad de Análisis Financiero|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Hacienda
+Unidad Ejecutora para la Readecuación de Barrios y Entornos|Unidad Ejecutora (Proyecto)|Poder Ejecutivo|Presidencia
+Unidad Técnica Ejecutora de Titulación de Terrenos del Estado|Unidad Ejecutora (Proyecto)|Poder Ejecutivo|Presidencia
+Universidad Autónoma de Santo Domingo|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología
+Universidad Tecnológica del Cibao Oriental|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Educación Superior, Ciencia y Tecnología

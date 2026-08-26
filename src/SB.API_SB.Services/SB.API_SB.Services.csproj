@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Capa de Servicios: implementa los casos de uso declarados en la capa de
+    Aplicacion. Orquesta entidades de Dominio y repositorios, pero NO conoce
+    detalles de persistencia (Entity Framework, archivos, HTTP, etc.).
+  -->
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.9.2" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SB.API_SB.Application\SB.API_SB.Application.csproj" />
+    <ProjectReference Include="..\SB.API_SB.Domain\SB.API_SB.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

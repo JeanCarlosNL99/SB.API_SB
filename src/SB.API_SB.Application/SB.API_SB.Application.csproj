@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Capa de Aplicacion: define los casos de uso mediante contratos (interfaces
+    de servicio), objetos de transferencia de datos (DTO) y validaciones.
+    Solo depende del Dominio.
+  -->
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.9.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SB.API_SB.Domain\SB.API_SB.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

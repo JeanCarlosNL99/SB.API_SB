@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Capa de Dominio: nucleo de la arquitectura Onion.
+    Regla: no tiene NINGUNA referencia a otros proyectos ni a paquetes de
+    infraestructura. Solo contiene entidades, enumeraciones, reglas de negocio,
+    excepciones de dominio y contratos (interfaces) de repositorio.
+  -->
+  <ItemGroup>
+    <None Remove="**/*.md" />
+  </ItemGroup>
+
+</Project>
