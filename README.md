@@ -515,6 +515,8 @@ correlación** que también se devuelve al cliente en las respuestas de error.
 
 ## 12. Documentación adicional
 
+- [`INSTALACION.md`](INSTALACION.md) — guía paso a paso para clonar el
+  repositorio, instalar los requisitos y ejecutar la aplicación desde cero.
 - [`docs/REPORTE-TECNICO.md`](docs/REPORTE-TECNICO.md) — arquitectura,
   metodologías, tecnologías empleadas y justificación de cada decisión.
 - [`docs/RESPUESTAS-CONCEPTUALIZACION.md`](docs/RESPUESTAS-CONCEPTUALIZACION.md) —
