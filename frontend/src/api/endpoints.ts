@@ -16,7 +16,6 @@ import type {
   UpdateGovernmentEntityRequest,
   UpdateUserRequest,
   User,
-  WeeklyPayrollReport,
 } from '@/types/api';
 
 /**
@@ -128,18 +127,6 @@ export const departmentsApi = {
   /** Obtiene todos los departamentos. */
   async getAll(): Promise<Department[]> {
     const { data } = await httpClient.get<Department[]>('/departamentos');
-
-    return data;
-  },
-};
-
-export const payrollReportsApi = {
-  /** Genera el reporte semanal de nomina. */
-  async getWeeklyReport(onlyActiveEmployees: boolean): Promise<WeeklyPayrollReport> {
-    const { data } = await httpClient.get<WeeklyPayrollReport>(
-      '/reportes-nomina/semanal',
-      { params: { soloEmpleadosActivos: onlyActiveEmployees } },
-    );
 
     return data;
   },

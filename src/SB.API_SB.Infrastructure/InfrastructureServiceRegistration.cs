@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using SB.API_SB.Application.Interfaces.Common;
 using SB.API_SB.Application.Interfaces.Security;
 using SB.API_SB.Domain.Interfaces.Repositories;
+using SB.API_SB.Application.Interfaces.EventLog;
 using SB.API_SB.Infrastructure.Common;
+using SB.API_SB.Infrastructure.EventLog;
 using SB.API_SB.Infrastructure.FlatFileStorage;
 using SB.API_SB.Infrastructure.Options;
 using SB.API_SB.Infrastructure.Persistence;
@@ -49,6 +51,7 @@ public static class InfrastructureServiceRegistration
         services.AddCommonServices();
         services.AddRelationalPersistence(configuration);
         services.AddFlatFilePersistence();
+        services.AddEventLogAccess();
         services.AddSecurityServices();
 
         return services;
@@ -76,6 +79,11 @@ public static class InfrastructureServiceRegistration
         services
             .AddOptions<SeedOptions>()
             .Bind(configuration.GetSection(SeedOptions.SECTION_NAME))
+            .ValidateOnStart();
+
+        services
+            .AddOptions<EventLogOptions>()
+            .Bind(configuration.GetSection(EventLogOptions.SECTION_NAME))
             .ValidateOnStart();
     }
 
@@ -107,11 +115,14 @@ public static class InfrastructureServiceRegistration
             serviceProvider.GetRequiredService<ApplicationDbContext>());
 
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<ICompanyRepository, CompanyRepository>();
+        services.AddScoped<IPayrollRunRepository, PayrollRunRepository>();
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
 
         services.AddScoped<DatabaseSeeder>();
+        services.AddScoped<PayrollHistorySeeder>();
         services.AddScoped<DatabaseInitializer>();
     }
 
@@ -167,6 +178,13 @@ public static class InfrastructureServiceRegistration
         // para toda la aplicacion.
         services.AddSingleton<IGovernmentEntityRepository, GovernmentEntityFileRepository>();
         services.AddSingleton<GovernmentEntityFileInitializer>();
+    }
+
+    private static void AddEventLogAccess(this IServiceCollection services)
+    {
+        // La lectura del registro no mantiene estado: se registra como singleton
+        // porque abre y cierra el archivo en cada consulta.
+        services.AddSingleton<IEventLogReader, SerilogFileEventLogReader>();
     }
 
     private static void AddSecurityServices(this IServiceCollection services)

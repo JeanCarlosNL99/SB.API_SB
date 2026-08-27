@@ -33,6 +33,12 @@ public abstract class Employee : AuditableEntity
     /// <summary>Numero de seguro social. Identifica al empleado de forma unica.</summary>
     public string SocialSecurityNumber { get; set; } = string.Empty;
 
+    /// <summary>Identificador de la compania que emplea a la persona.</summary>
+    public Guid CompanyId { get; set; }
+
+    /// <summary>Compania que emplea a la persona y que paga su nomina.</summary>
+    public Company? Company { get; set; }
+
     /// <summary>Identificador del departamento al que pertenece el empleado.</summary>
     public Guid DepartmentId { get; set; }
 

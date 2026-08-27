@@ -43,6 +43,18 @@ public static class ValidationLimits
     /// <summary>Longitud maxima admitida para una contrasena.</summary>
     public const int PASSWORD_MAXIMUM_LENGTH = 100;
 
+    /// <summary>Longitud maxima de la razon social de una compania.</summary>
+    public const int COMPANY_NAME_MAXIMUM_LENGTH = 200;
+
+    /// <summary>Longitud maxima del Registro Nacional de Contribuyente.</summary>
+    public const int TAX_IDENTIFICATION_MAXIMUM_LENGTH = 20;
+
+    /// <summary>Longitud maxima del motivo de anulacion de una nomina.</summary>
+    public const int CANCELLATION_REASON_MAXIMUM_LENGTH = 500;
+
+    /// <summary>Longitud minima del motivo de anulacion de una nomina.</summary>
+    public const int CANCELLATION_REASON_MINIMUM_LENGTH = 10;
+
     /// <summary>Monto maximo admitido en cualquier campo monetario.</summary>
     public const decimal MONETARY_MAXIMUM_VALUE = 10_000_000m;
 }

@@ -22,6 +22,9 @@ public sealed class ExceptionHandlingMiddleware
     private const string CORRELATION_IDENTIFIER_KEY = "correlationId";
     private const string ERROR_CODE_KEY = "errorCode";
     private const string VALIDATION_ERRORS_KEY = "errors";
+    private const string EXISTING_PAYROLL_RUN_KEY = "existingPayrollRunId";
+    private const string PAYROLL_YEAR_KEY = "payrollYear";
+    private const string PAYROLL_WEEK_NUMBER_KEY = "payrollWeekNumber";
     private const string GENERIC_ERROR_TITLE = "Ocurrio un error inesperado.";
     private const string GENERIC_ERROR_DETAIL =
         "Ocurrio un error inesperado al procesar la solicitud. " +
@@ -72,6 +75,8 @@ public sealed class ExceptionHandlingMiddleware
                 "Registro duplicado.",
                 duplicatedException.Message,
                 duplicatedException.ErrorCode),
+            DuplicatedPayrollRunException duplicatedPayrollRunException =>
+                BuildDuplicatedPayrollRunProblemDetails(duplicatedPayrollRunException),
             InvalidCredentialsException credentialsException => BuildProblemDetails(
                 HttpStatusCode.Unauthorized,
                 "Credenciales invalidas.",
@@ -167,6 +172,32 @@ public sealed class ExceptionHandlingMiddleware
         };
 
         problemDetails.Extensions[ERROR_CODE_KEY] = errorCode;
+
+        return problemDetails;
+    }
+
+    /// <summary>
+    /// Traduce el intento de pagar dos veces la misma semana.
+    /// </summary>
+    /// <remarks>
+    /// Se devuelve el identificador de la ejecucion existente para que el cliente
+    /// pueda ofrecer un enlace directo a la nomina ya generada, en lugar de dejar
+    /// al usuario buscandola en el historial.
+    /// </remarks>
+    /// <param name="exception">Excepcion de semana ya pagada.</param>
+    /// <returns>Detalle del problema con el conflicto descrito.</returns>
+    private static ProblemDetails BuildDuplicatedPayrollRunProblemDetails(
+        DuplicatedPayrollRunException exception)
+    {
+        ProblemDetails problemDetails = BuildProblemDetails(
+            HttpStatusCode.Conflict,
+            "La semana ya tiene nomina generada.",
+            exception.Message,
+            exception.ErrorCode);
+
+        problemDetails.Extensions[EXISTING_PAYROLL_RUN_KEY] = exception.ExistingPayrollRunId;
+        problemDetails.Extensions[PAYROLL_YEAR_KEY] = exception.Year;
+        problemDetails.Extensions[PAYROLL_WEEK_NUMBER_KEY] = exception.WeekNumber;
 
         return problemDetails;
     }

@@ -2,12 +2,15 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { LoadingIndicator } from '@/components/Feedback';
 import { useAuthentication } from '@/hooks/useAuthentication';
+import { CompaniesPage } from '@/pages/CompaniesPage';
 import { CreateGovernmentEntityPage } from '@/pages/CreateGovernmentEntityPage';
 import { EmployeesPage } from '@/pages/EmployeesPage';
+import { EventLogPage } from '@/pages/EventLogPage';
 import { GovernmentEntitiesPage } from '@/pages/GovernmentEntitiesPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
-import { PayrollReportPage } from '@/pages/PayrollReportPage';
+import { PayrollHistoryPage } from '@/pages/PayrollHistoryPage';
+import { PayrollPage } from '@/pages/PayrollPage';
 import { UsersPage } from '@/pages/UsersPage';
 import type { ReactNode } from 'react';
 
@@ -31,6 +34,7 @@ export function App() {
         }
       >
         <Route path="/inicio" element={<HomePage />} />
+
         <Route path="/entidades" element={<GovernmentEntitiesPage />} />
         <Route
           path="/entidades/nuevo"
@@ -40,13 +44,25 @@ export function App() {
             </RequireWritePermission>
           }
         />
+
+        <Route path="/companias" element={<CompaniesPage />} />
         <Route path="/empleados" element={<EmployeesPage />} />
-        <Route path="/nomina" element={<PayrollReportPage />} />
+        <Route path="/nomina" element={<PayrollPage />} />
+        <Route path="/nomina/historial" element={<PayrollHistoryPage />} />
+
         <Route
           path="/usuarios"
           element={
             <RequireAdministrator>
               <UsersPage />
+            </RequireAdministrator>
+          }
+        />
+        <Route
+          path="/registro-eventos"
+          element={
+            <RequireAdministrator>
+              <EventLogPage />
             </RequireAdministrator>
           }
         />

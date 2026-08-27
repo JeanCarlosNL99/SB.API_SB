@@ -60,13 +60,42 @@ export function formatPercentage(value: number | null | undefined): string {
   return percentageFormatter.format(value);
 }
 
+/** Reconoce una fecha sin hora, en formato AAAA-MM-DD. */
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Interpreta un valor de fecha recibido de la API.
+ *
+ * Una fecha sin hora (por ejemplo, el inicio de un periodo de nomina) se
+ * construye como fecha local. Si se dejara a <c>new Date</c>, la cadena
+ * "2026-08-24" se interpretaria como medianoche UTC y al mostrarla en una zona
+ * al oeste de Greenwich aparaceria el dia anterior. Los valores con hora si
+ * llevan zona y se interpretan tal cual.
+ *
+ * @param value Valor recibido de la API.
+ * @returns Fecha interpretada.
+ */
+function parseApiDate(value: string): Date {
+  const dateOnlyMatch = DATE_ONLY_PATTERN.exec(value);
+
+  if (dateOnlyMatch !== null) {
+    return new Date(
+      Number(dateOnlyMatch[1]),
+      Number(dateOnlyMatch[2]) - 1,
+      Number(dateOnlyMatch[3]),
+    );
+  }
+
+  return new Date(value);
+}
+
 /** Formatea una fecha y hora en formato local. */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) {
     return '-';
   }
 
-  return dateTimeFormatter.format(new Date(value));
+  return dateTimeFormatter.format(parseApiDate(value));
 }
 
 /** Formatea una fecha en formato local. */
@@ -75,5 +104,5 @@ export function formatDate(value: string | null | undefined): string {
     return '-';
   }
 
-  return dateFormatter.format(new Date(value));
+  return dateFormatter.format(parseApiDate(value));
 }

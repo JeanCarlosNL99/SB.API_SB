@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { departmentsApi, employeesApi } from '@/api/endpoints';
+import { companiesApi } from '@/api/payrollEndpoints';
 import { EmployeeForm } from '@/components/EmployeeForm';
 import { EMPLOYEE_TYPE_DEFINITIONS } from '@/constants/employeeTypes';
 import {
@@ -27,6 +28,7 @@ import type {
 
 const INITIAL_FILTER: EmployeeFilter = {
   name: '',
+  companyId: '',
   departmentId: '',
   status: '',
   type: '',
@@ -52,6 +54,7 @@ export function EmployeesPage() {
   const [operationError, setOperationError] = useState<unknown>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const companiesQuery = useAsyncData(() => companiesApi.getAll(), []);
   const departmentsQuery = useAsyncData(() => departmentsApi.getAll(), []);
 
   // El campo de texto responde de inmediato en pantalla, pero la consulta se
@@ -62,6 +65,7 @@ export function EmployeesPage() {
     () => employeesApi.search({ ...filter, name: debouncedName }),
     [
       debouncedName,
+      filter.companyId,
       filter.departmentId,
       filter.status,
       filter.type,
@@ -85,6 +89,7 @@ export function EmployeesPage() {
 
   const hasActiveFilters =
     (filter.name ?? '') !== '' ||
+    (filter.companyId ?? '') !== '' ||
     (filter.departmentId ?? '') !== '' ||
     (filter.status ?? '') !== '' ||
     (filter.type ?? '') !== '';
@@ -257,6 +262,27 @@ export function EmployeesPage() {
           </div>
 
           <div className="field">
+            <label className="field__label" htmlFor="employeeCompany">
+              Compania
+            </label>
+            <select
+              id="employeeCompany"
+              className="control"
+              value={filter.companyId ?? ''}
+              onChange={(changeEvent) =>
+                updateFilter({ companyId: changeEvent.target.value })
+              }
+            >
+              <option value="">Todas</option>
+              {(companiesQuery.data ?? []).map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
             <label className="field__label" htmlFor="employeeDepartment">
               Departamento
             </label>
@@ -361,6 +387,7 @@ export function EmployeesPage() {
                       <th>Empleado</th>
                       <th>Seguro social</th>
                       <th>Tipo de contrato</th>
+                      <th>Compania</th>
                       <th>Departamento</th>
                       <th>Estado</th>
                       <th className="table th--numeric">Pago semanal</th>
@@ -385,6 +412,7 @@ export function EmployeesPage() {
                             {employee.typeDescription}
                           </span>
                         </td>
+                        <td className="table td--wrap">{employee.companyName}</td>
                         <td>{employee.departmentName}</td>
                         <td>
                           <span
@@ -460,6 +488,7 @@ export function EmployeesPage() {
         onClose={() => setIsCreating(false)}
       >
         <EmployeeForm
+          companies={companiesQuery.data ?? []}
           departments={departmentsQuery.data ?? []}
           isSubmitting={isProcessing}
           submitError={operationError}
@@ -477,7 +506,8 @@ export function EmployeesPage() {
         {employeeBeingEdited && (
           <EmployeeForm
             employee={employeeBeingEdited}
-            departments={departmentsQuery.data ?? []}
+            companies={companiesQuery.data ?? []}
+          departments={departmentsQuery.data ?? []}
             isSubmitting={isProcessing}
             submitError={operationError}
             onSubmit={handleUpdate}
@@ -521,6 +551,10 @@ function EmployeeDetail({ employee }: { employee: Employee }) {
       <div className="detail-row">
         <span className="detail-row__label">Tipo de contrato</span>
         <span className="detail-row__value">{employee.typeDescription}</span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-row__label">Compania</span>
+        <span className="detail-row__value">{employee.companyName}</span>
       </div>
       <div className="detail-row">
         <span className="detail-row__label">Departamento</span>

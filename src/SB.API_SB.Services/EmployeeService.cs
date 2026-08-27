@@ -28,6 +28,7 @@ public sealed class EmployeeService : IEmployeeService
 
     private readonly IEmployeeRepository employeeRepository;
     private readonly IDepartmentRepository departmentRepository;
+    private readonly ICompanyRepository companyRepository;
     private readonly IEmployeeTypeHandlerResolver typeHandlerResolver;
     private readonly IUnitOfWork unitOfWork;
     private readonly ILogger<EmployeeService> logger;
@@ -35,12 +36,14 @@ public sealed class EmployeeService : IEmployeeService
     public EmployeeService(
         IEmployeeRepository employeeRepository,
         IDepartmentRepository departmentRepository,
+        ICompanyRepository companyRepository,
         IEmployeeTypeHandlerResolver typeHandlerResolver,
         IUnitOfWork unitOfWork,
         ILogger<EmployeeService> logger)
     {
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
+        this.companyRepository = companyRepository;
         this.typeHandlerResolver = typeHandlerResolver;
         this.unitOfWork = unitOfWork;
         this.logger = logger;
@@ -56,6 +59,7 @@ public sealed class EmployeeService : IEmployeeService
         EmployeeFilterCriteria criteria = new()
         {
             Name = filter.Name,
+            CompanyId = filter.CompanyId,
             DepartmentId = filter.DepartmentId,
             Status = filter.Status,
             Type = filter.Type,
@@ -99,6 +103,7 @@ public sealed class EmployeeService : IEmployeeService
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
         await EnsureDepartmentExistsAsync(request.DepartmentId, cancellationToken);
         await EnsureSocialSecurityNumberIsAvailableAsync(
             request.SocialSecurityNumber,
@@ -139,6 +144,7 @@ public sealed class EmployeeService : IEmployeeService
                 "No se puede cambiar el tipo de contrato de un empleado ya registrado.");
         }
 
+        await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
         await EnsureDepartmentExistsAsync(request.DepartmentId, cancellationToken);
         await EnsureSocialSecurityNumberIsAvailableAsync(
             request.SocialSecurityNumber,
@@ -178,6 +184,24 @@ public sealed class EmployeeService : IEmployeeService
         CancellationToken cancellationToken) =>
         await employeeRepository.GetWithDepartmentAsync(employeeId, cancellationToken)
             ?? throw new EntityNotFoundException(EMPLOYEE_ENTITY_NAME, employeeId);
+
+    private async Task EnsureCompanyExistsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken)
+    {
+        Company? company = await companyRepository.GetByIdAsync(companyId, cancellationToken);
+
+        if (company is null)
+        {
+            throw new EntityNotFoundException("la compania", companyId);
+        }
+
+        if (!company.IsActive)
+        {
+            throw new BusinessRuleViolationException(
+                $"La compania '{company.Name}' esta inactiva y no admite nuevos empleados.");
+        }
+    }
 
     private async Task EnsureDepartmentExistsAsync(
         Guid departmentId,

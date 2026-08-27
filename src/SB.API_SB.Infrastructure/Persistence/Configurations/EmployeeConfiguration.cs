@@ -71,6 +71,16 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(employee => new { employee.DepartmentId, employee.Status })
             .HasDatabaseName("IX_Employees_DepartmentId_Status");
 
+        // Indice que respalda tanto el filtro por compania de la consulta como la
+        // seleccion de empleados activos al calcular la nomina semanal.
+        builder.HasIndex(employee => new { employee.CompanyId, employee.Status })
+            .HasDatabaseName("IX_Employees_CompanyId_Status");
+
+        builder.HasOne(employee => employee.Company)
+            .WithMany(company => company.Employees)
+            .HasForeignKey(employee => employee.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(employee => employee.Department)
             .WithMany(department => department.Employees)
             .HasForeignKey(employee => employee.DepartmentId)

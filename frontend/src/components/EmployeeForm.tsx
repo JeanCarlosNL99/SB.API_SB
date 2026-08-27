@@ -5,6 +5,7 @@ import {
 } from '@/constants/employeeTypes';
 import { ErrorMessage } from './Feedback';
 import type {
+  Company,
   Department,
   Employee,
   EmployeeRequest,
@@ -30,6 +31,7 @@ type FormValues = Record<string, string> & {
  */
 export function EmployeeForm({
   employee,
+  companies,
   departments,
   isSubmitting,
   submitError,
@@ -37,6 +39,7 @@ export function EmployeeForm({
   onCancel,
 }: {
   employee?: Employee | null;
+  companies: Company[];
   departments: Department[];
   isSubmitting: boolean;
   submitError: unknown;
@@ -58,6 +61,11 @@ export function EmployeeForm({
   const activeDepartments = useMemo(
     () => departments.filter((department) => department.isActive),
     [departments],
+  );
+
+  const activeCompanies = useMemo(
+    () => companies.filter((company) => company.isActive),
+    [companies],
   );
 
   function updateValue(key: string, value: string) {
@@ -104,6 +112,7 @@ export function EmployeeForm({
                 firstName: previousValues.firstName,
                 paternalLastName: previousValues.paternalLastName,
                 socialSecurityNumber: previousValues.socialSecurityNumber,
+                companyId: previousValues.companyId,
                 departmentId: previousValues.departmentId,
               }));
             }}
@@ -162,6 +171,31 @@ export function EmployeeForm({
           error={validationErrors.socialSecurityNumber}
           onChange={(value) => updateValue('socialSecurityNumber', value)}
         />
+
+        <div className="field">
+          <label className="field__label" htmlFor="companyId">
+            Compania
+          </label>
+          <select
+            id="companyId"
+            className={`control${validationErrors.companyId ? ' control--invalid' : ''}`}
+            value={values.companyId}
+            onChange={(changeEvent) => updateValue('companyId', changeEvent.target.value)}
+          >
+            <option value="">Seleccione una compania</option>
+            {activeCompanies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+          <span className="field__hint">
+            La nomina del empleado se calcula con la de su compania.
+          </span>
+          {validationErrors.companyId && (
+            <span className="field__error">{validationErrors.companyId}</span>
+          )}
+        </div>
 
         <div className="field">
           <label className="field__label" htmlFor="departmentId">
@@ -287,6 +321,7 @@ function buildInitialValues(employee: Employee | null | undefined): FormValues {
     type: employee?.type ?? 'Salaried',
     status: employee?.status ?? 'Active',
     firstName: employee?.firstName ?? '',
+    companyId: employee?.companyId ?? '',
     paternalLastName: employee?.paternalLastName ?? '',
     socialSecurityNumber: employee?.socialSecurityNumber ?? '',
     departmentId: employee?.departmentId ?? '',
@@ -323,6 +358,10 @@ function validate(
     errors.socialSecurityNumber = `Debe tener al menos ${SOCIAL_SECURITY_NUMBER_MINIMUM_LENGTH} caracteres.`;
   } else if (!SOCIAL_SECURITY_NUMBER_PATTERN.test(socialSecurityNumber)) {
     errors.socialSecurityNumber = 'Solo admite letras, numeros y guiones.';
+  }
+
+  if (values.companyId.length === 0) {
+    errors.companyId = 'Seleccione una compania.';
   }
 
   if (values.departmentId.length === 0) {
@@ -368,6 +407,7 @@ function buildRequest(
     firstName: values.firstName.trim().length > 0 ? values.firstName.trim() : null,
     paternalLastName: values.paternalLastName.trim(),
     socialSecurityNumber: values.socialSecurityNumber.trim(),
+    companyId: values.companyId,
     departmentId: values.departmentId,
     status: values.status,
   };

@@ -19,6 +19,9 @@ public sealed class EmployeeRequestValidationTests
     private static readonly Guid DEPARTMENT_ID =
         Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
+    private static readonly Guid COMPANY_ID =
+        Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     private readonly CreateEmployeeRequestValidator validator = new();
 
     [Fact]
@@ -166,6 +169,7 @@ public sealed class EmployeeRequestValidationTests
         Type = employeeType,
         PaternalLastName = "Martinez",
         SocialSecurityNumber = "001-0000001-1",
+        CompanyId = COMPANY_ID,
         DepartmentId = DEPARTMENT_ID,
         Status = EmployeeStatus.Active
     };

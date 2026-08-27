@@ -152,3 +152,37 @@ export function InstitutionIcon(props: IconProps) {
     </IconBase>
   );
 }
+
+/** Icono de compania. */
+export function CompanyIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="3" y="7" width="12" height="14" rx="1.5" />
+      <path d="M15 11h5a1 1 0 0 1 1 1v9h-6" />
+      <path d="M7 11h2M7 15h2M7 19h2M12 11h.01M12 15h.01M12 19h.01" />
+      <path d="M3 7l6-4 6 4" />
+    </IconBase>
+  );
+}
+
+/** Icono de historial. */
+export function HistoryIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4.5l3 1.8" />
+    </IconBase>
+  );
+}
+
+/** Icono del registro de eventos. */
+export function EventLogIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5 3h9l5 5v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M8 13h8M8 17h5" />
+    </IconBase>
+  );
+}

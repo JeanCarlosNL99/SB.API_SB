@@ -4,6 +4,7 @@ using SB.API_SB.Application.Interfaces.Employees;
 using SB.API_SB.Application.Interfaces.Services;
 using SB.API_SB.Application.Validators.Employees;
 using SB.API_SB.Services.Employees;
+using SB.API_SB.Application.Interfaces.Payroll;
 using SB.API_SB.Services.Payroll;
 
 namespace SB.API_SB.Services;
@@ -26,7 +27,13 @@ public static class ServicesServiceRegistration
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IGovernmentEntityService, GovernmentEntityService>();
-        services.AddScoped<IPayrollReportService, PayrollReportService>();
+        services.AddScoped<ICompanyService, CompanyService>();
+        services.AddScoped<IPayrollRunService, PayrollRunService>();
+        services.AddScoped<IEventLogService, EventLogService>();
+
+        // El calculador no mantiene estado: se comparte entre la vista previa y la
+        // generacion de nomina.
+        services.AddSingleton<IPayrollCalculator, PayrollCalculator>();
 
         services.AddEmployeeTypeHandlers();
         services.AddRequestValidators();

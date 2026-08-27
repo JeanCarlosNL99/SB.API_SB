@@ -4,16 +4,19 @@ Solución completa para la prueba técnica de la **Superintendencia de Bancos de
 República Dominicana**: una API RESTful en .NET 8 con arquitectura Onion y una
 aplicación web en React + TypeScript que consume esa API.
 
-La solución cubre tres módulos:
+La solución cubre cuatro módulos:
 
 1. **Entidades gubernamentales** — mantenimiento del listado oficial de la
    República Dominicana (181 registros), persistido en un **archivo de texto
    plano** ubicado dentro del propio proyecto.
-2. **Empleados y nómina** — gestión de empleados con cálculo automático del pago
-   semanal según cuatro tipos de contrato, con filtros por nombre, departamento y
-   estado, y reporte semanal detallado.
-3. **Usuarios y roles** — autenticación con **JWT** (`Authorization: Bearer`) y
-   autorización por rol.
+2. **Compañías y empleados** — cada empleado pertenece a una compañía; captura de
+   datos por tipo de contrato y filtros por nombre, compañía, departamento y estado.
+3. **Cálculo de pagos semanales** — generación de la nómina de una semana por
+   compañía, con historial de semanas anteriores. **Una semana solo puede pagarse
+   una vez.**
+4. **Usuarios, roles y registro de eventos** — autenticación con **JWT**
+   (`Authorization: Bearer`), autorización por rol y consulta del log desde la
+   propia aplicación (solo administrador).
 
 ---
 
@@ -59,8 +62,10 @@ En el primer arranque, la aplicación:
 - genera `src/SB.API_SB.Presentation/Database/GovernmentEntities.txt` a partir del
   archivo semilla con las 181 entidades gubernamentales;
 - crea la base de datos relacional (SQLite por defecto) y siembra roles, el
-  usuario administrador, cinco departamentos y cinco empleados de demostración
-  que ejercitan los cuatro tipos de cálculo de nómina.
+  usuario administrador, cinco departamentos, **tres compañías**, **once empleados**
+  que ejercitan los cuatro tipos de cálculo y **24 nóminas históricas** (ocho
+  semanas anteriores por compañía) para que el historial tenga datos desde el
+  primer momento.
 
 ### 2.2 Frontend (portal web)
 
@@ -100,9 +105,10 @@ SB.API_SB.sln
 │   ├── SB.API_SB.Services          → Implementación de los casos de uso
 │   ├── SB.API_SB.Infrastructure    → EF Core, archivo de texto plano, JWT, hashing
 │   └── SB.API_SB.Presentation      → Host de la API: controladores, middlewares, Swagger
-│       └── Database/               → Base de datos de texto plano (dentro del proyecto)
+│       ├── Database/               → Base de datos de texto plano (dentro del proyecto)
+│       └── Logs/                   → Registro de Serilog (texto y JSON), consultable desde la app
 ├── tests/
-│   └── SB.API_SB.Tests             → 77 pruebas unitarias (xUnit + NSubstitute)
+│   └── SB.API_SB.Tests             → 98 pruebas unitarias (xUnit + NSubstitute)
 ├── frontend/                       → Aplicación React + TypeScript (Vite)
 └── docs/                           → Reporte técnico y respuestas de conceptualización
 ```
@@ -137,6 +143,7 @@ Toda la configuración vive en `src/SB.API_SB.Presentation/appsettings.json`.
 | `Jwt` | `Issuer`, `Audience`, `SigningKey` | Parámetros del token. |
 | `Jwt` | `AccessTokenExpirationMinutes` | Vigencia del token (120 por defecto). |
 | `Seed` | `Administrator*` | Datos del usuario administrador inicial. |
+| `EventLog` | `DirectoryPath` | Directorio de los archivos de registro, relativo al proyecto. |
 | `Cors` | `AllowedOrigins` | Orígenes autorizados del portal web. |
 | `Serilog` | — | Niveles y destinos del registro de eventos. |
 
@@ -158,7 +165,7 @@ a cada almacén el módulo que le corresponde:
 | Módulo | Almacén | Motivo |
 |---|---|---|
 | Entidades gubernamentales | Archivo de texto plano dentro del proyecto | Requisito explícito del mantenimiento solicitado. |
-| Empleados, departamentos, usuarios y roles | Base de datos relacional con EF Core | Requieren relaciones, índices únicos y transacciones. |
+| Compañías, empleados, departamentos, nóminas, usuarios y roles | Base de datos relacional con EF Core | Requieren relaciones, índices únicos y transacciones. |
 
 Las dos implementaciones satisfacen contratos declarados en el Dominio
 (`IGovernmentEntityRepository`, `IEmployeeRepository`, …), por lo que **la lógica
@@ -172,7 +179,7 @@ de negocio no sabe cuál tecnología la respalda**.
 dotnet test
 ```
 
-77 pruebas unitarias distribuidas así:
+98 pruebas unitarias distribuidas así:
 
 | Área | Archivo | Qué verifica |
 |---|---|---|
@@ -184,6 +191,8 @@ dotnet test
 | Formato del archivo | `FlatFileRecordSerializerTests` | Escape reversible de `|`, `\` y saltos de línea. |
 | Seguridad | `PasswordHasherTests` | Derivación PBKDF2, sales distintas y verificación. |
 | Extensibilidad | `EmployeeTypeHandlerResolverTests` | Que todo tipo del enumerado tenga manejador registrado. |
+| Semana de nómina | `PayrollWeekTests` | Identidad ISO 8601 de la semana, límites de fin de año y años de 53 semanas. |
+| Pago semanal | `PayrollRunServiceTests` | Que una semana no se pueda pagar dos veces, la instantánea del cálculo, la anulación y el límite de 1,000 empleados en menos de 2 s. |
 
 Frontend:
 
@@ -219,7 +228,17 @@ Todos los endpoints, salvo los indicados, exigen el encabezado
 Filtros aceptados en la consulta: `name`, `category`, `sector`, `stateBranch`,
 `status`, `pageNumber`, `pageSize`.
 
-### Empleados y nómina
+### Compañías
+
+| Método | Ruta | Rol requerido |
+|---|---|---|
+| `GET` | `/api/companias` | Cualquier rol |
+| `GET` | `/api/companias/{id}` | Cualquier rol |
+| `POST` | `/api/companias` | Administrador o RecursosHumanos |
+| `PUT` | `/api/companias/{id}` | Administrador o RecursosHumanos |
+| `DELETE` | `/api/companias/{id}` | Administrador |
+
+### Empleados
 
 | Método | Ruta | Rol requerido |
 |---|---|---|
@@ -228,12 +247,34 @@ Filtros aceptados en la consulta: `name`, `category`, `sector`, `stateBranch`,
 | `POST` | `/api/empleados` | Administrador o RecursosHumanos |
 | `PUT` | `/api/empleados/{id}` | Administrador o RecursosHumanos |
 | `DELETE` | `/api/empleados/{id}` | Administrador o RecursosHumanos |
-| `GET` | `/api/reportes-nomina/semanal` | Cualquier rol |
 | `GET` | `/api/departamentos` | Cualquier rol |
 
-Filtros de empleados: `name`, `departmentId`, `status`, `type`, `pageNumber`,
-`pageSize`.
+Filtros de empleados: `name`, `companyId`, `departmentId`, `status`, `type`,
+`pageNumber`, `pageSize`.
 
+### Cálculo de pagos semanales
+
+| Método | Ruta | Descripción | Rol requerido |
+|---|---|---|---|
+| `GET` | `/api/nomina/vista-previa` | Calcula la semana sin guardarla e informa si ya fue pagada | Cualquier rol |
+| `POST` | `/api/nomina/ejecuciones` | Genera el pago de la semana. **409 si ya existe** | Administrador o RecursosHumanos |
+| `GET` | `/api/nomina/ejecuciones` | Historial paginado | Cualquier rol |
+| `GET` | `/api/nomina/ejecuciones/{id}` | Detalle con el desglose por empleado | Cualquier rol |
+| `POST` | `/api/nomina/ejecuciones/{id}/anular` | Anula y libera la semana | Administrador |
+| `GET` | `/api/nomina/semanas-generadas` | Semanas ya pagadas de un año | Cualquier rol |
+
+Parámetros de la vista previa: `companyId`, `year`, `weekNumber`,
+`onlyActiveEmployees`. Filtros del historial: `companyId`, `year`,
+`includeCancelled`, `pageNumber`, `pageSize`.
+
+### Registro de eventos
+
+| Método | Ruta | Rol requerido |
+|---|---|---|
+| `GET` | `/api/registro-eventos/archivos` | **Administrador** |
+| `GET` | `/api/registro-eventos` | **Administrador** |
+
+Filtros: `fileName`, `minimumLevel`, `searchTerm`, `maximumEntries`.
 ### Usuarios
 
 | Método | Ruta | Rol requerido |
@@ -253,7 +294,60 @@ Filtros de empleados: `name`, `departmentId`, `status`, `type`, `pageNumber`,
 
 ---
 
-## 7. Ejemplo de uso
+## 7. El flujo de pago semanal
+
+Es el caso de uso central del sistema. Estos son los pasos, con lo que hace la
+aplicación en cada uno.
+
+### 7.1 En el portal web
+
+1. **Registrar las compañías** (menú *Nómina → Compañías*). Cada compañía tiene
+   razón social y Registro Nacional de Contribuyente único.
+2. **Capturar los empleados** (menú *Nómina → Empleados*), asignando a cada uno su
+   compañía, su departamento y su tipo de contrato. Los campos solicitados cambian
+   según el tipo.
+3. **Calcular el pago de la semana** (menú *Nómina → Calcular pago semanal*):
+   se elige la compañía y la semana, y la pantalla muestra el cálculo propuesto con
+   el desglose de cada empleado. **Nada se ha guardado todavía.**
+4. **Generar el pago.** El documento queda almacenado con la instantánea de lo que
+   se pagó. Si la semana ya fue pagada, el botón queda deshabilitado y se explica
+   por qué.
+5. **Consultar el historial** (menú *Nómina → Historial de pagos*): las nóminas de
+   semanas anteriores, con el detalle de cada una.
+
+### 7.2 Una semana solo se paga una vez
+
+La regla se aplica en dos niveles independientes:
+
+| Nivel | Mecanismo |
+|---|---|
+| Interfaz | La vista previa consulta si la semana ya fue pagada y deshabilita el botón antes de que el usuario pueda intentarlo. |
+| Servicio | Comprueba la existencia de una ejecución vigente y responde **HTTP 409** con el identificador de la nómina existente. |
+| Base de datos | Índice único filtrado sobre `(CompanyId, Year, WeekNumber)` para las ejecuciones vigentes. Cierra la ventana de una condición de carrera entre dos peticiones simultáneas. |
+
+Si hay que corregir una semana ya pagada, un **administrador** la anula indicando
+el motivo. El documento se conserva como evidencia y la semana queda libre para
+recalcularse.
+
+### 7.3 El historial no se recalcula
+
+Cada línea de una nómina generada guarda el monto, la fórmula aplicada y el
+desglose **tal como quedaron el día en que se generó**. Si mañana cambian las
+horas trabajadas de un empleado, la nómina de la semana pasada sigue mostrando lo
+que realmente se pagó. Recalcular el histórico con los datos vigentes sería un
+error, no una optimización.
+
+### 7.4 Datos de demostración
+
+En el primer arranque se siembran **3 compañías**, **11 empleados** repartidos
+entre ellas y **24 nóminas históricas** (las 8 semanas anteriores a la actual, por
+cada compañía), con variación determinista de horas y ventas por semana para que
+el historial se parezca a uno real. La semana en curso y la anterior se dejan sin
+generar a propósito, para poder probar el flujo completo.
+
+---
+
+## 8. Ejemplo de uso de la API
 
 Obtener el token:
 
@@ -261,19 +355,46 @@ Obtener el token:
 curl -X POST http://localhost:5080/api/autenticacion/iniciar-sesion -H "Content-Type: application/json" -d "{\"userName\":\"administrador\",\"password\":\"Sb2024Admin\"}"
 ```
 
-Consultar entidades filtrando por nombre (41 de las 181 contienen "Instituto"):
+Consultar las compañías para obtener su identificador:
 
 ```bash
-curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/entidades-gubernamentales?name=Instituto&pageSize=5"
+curl -H "Authorization: Bearer <TOKEN>" http://localhost:5080/api/companias
 ```
 
-Registrar un empleado por horas:
+Ver el cálculo propuesto de una semana, sin guardarlo:
 
 ```bash
-curl -X POST http://localhost:5080/api/empleados -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"type\":\"Hourly\",\"paternalLastName\":\"Diaz\",\"socialSecurityNumber\":\"001-9999999-9\",\"departmentId\":\"<GUID>\",\"status\":\"Active\",\"hourlyWage\":300,\"hoursWorked\":45}"
+curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/nomina/vista-previa?companyId=<GUID>&year=2026&weekNumber=34"
 ```
 
-Respuesta (fragmento): el pago se calcula como `300 × 40 + 300 × 1.5 × 5`.
+Generar el pago de esa semana:
+
+```bash
+curl -X POST http://localhost:5080/api/nomina/ejecuciones -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"companyId\":\"<GUID>\",\"year\":2026,\"weekNumber\":34,\"onlyActiveEmployees\":true}"
+```
+
+Intentarlo de nuevo devuelve **HTTP 409** con el identificador de la nómina que ya
+existe:
+
+```json
+{
+  "title": "La semana ya tiene nomina generada.",
+  "status": 409,
+  "detail": "La compania 'Servicios Financieros del Caribe, S. A.' ya tiene la nomina de la semana 34 del ano 2026 generada. Una semana solo puede pagarse una vez; anule la ejecucion existente si necesita volver a calcularla.",
+  "errorCode": "NOMINA_SEMANA_YA_GENERADA",
+  "existingPayrollRunId": "fe49a02d-566e-4036-a8ea-8946c83b418e",
+  "payrollYear": 2026,
+  "payrollWeekNumber": 34
+}
+```
+
+Registrar un empleado por horas (el pago se calcula como `300 × 40 + 300 × 1.5 × 5`):
+
+```bash
+curl -X POST http://localhost:5080/api/empleados -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"type\":\"Hourly\",\"paternalLastName\":\"Diaz\",\"socialSecurityNumber\":\"001-9999999-9\",\"companyId\":\"<GUID>\",\"departmentId\":\"<GUID>\",\"status\":\"Active\",\"hourlyWage\":300,\"hoursWorked\":45}"
+```
+
+Respuesta (fragmento):
 
 ```json
 {
@@ -289,9 +410,13 @@ Respuesta (fragmento): el pago se calcula como `300 × 40 + 300 × 1.5 × 5`.
 }
 ```
 
----
+Consultar el registro de eventos (solo administrador):
 
-## 8. Reglas de cálculo de nómina
+```bash
+curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/registro-eventos?minimumLevel=Warning&maximumEntries=50"
+```
+
+## 9. Reglas de cálculo de nómina
 
 | Tipo | Campos capturados | Fórmula |
 |---|---|---|
@@ -306,13 +431,29 @@ el monto y el desglose que devuelve la API.
 
 ---
 
-## 9. Registro de eventos (logs)
+## 10. Registro de eventos (logs)
 
-Serilog escribe en dos destinos:
+Serilog escribe en tres destinos:
 
 - **Consola**, en formato compacto para desarrollo.
-- **Archivo diario** en `src/SB.API_SB.Presentation/Logs/sb-api-sb-AAAAMMDD.log`,
-  con rotación diaria, límite de 50 MB por archivo y retención de 30 días.
+- **Archivo de texto diario** en `Logs/sb-api-sb-AAAAMMDD.log`, pensado para leerse
+  en una terminal.
+- **Archivo JSON diario** en `Logs/sb-api-sb-AAAAMMDD.json`, pensado para
+  procesarse. Ambos con rotación diaria, límite de 50 MB por archivo y retención de
+  30 días.
+
+### 10.1 Consulta desde la aplicación
+
+El menú **Seguridad → Registro de eventos**, visible **solo para el rol
+administrador**, permite consultar el log sin acceso al servidor de archivos:
+seleccionar el archivo, filtrar por nivel mínimo, buscar en el mensaje o en el
+identificador de correlación, y desplegar la traza completa de las entradas con
+excepción.
+
+La lectura se hace sobre el archivo **JSON**: analizar registro estructurado es
+fiable, mientras que aplicar expresiones regulares al archivo de texto se rompe con
+cualquier mensaje que contenga un salto de línea. Solo se leen las últimas líneas
+del archivo, por lo que el consumo de memoria no depende de su tamaño.
 
 Se registra: el arranque y la siembra de datos, una línea por petición HTTP con
 método, ruta, código de respuesta y duración, cada operación de negocio (altas,
@@ -323,7 +464,7 @@ correlación** que también se devuelve al cliente en las respuestas de error.
 
 ---
 
-## 10. Convenciones de código aplicadas
+## 11. Convenciones de código aplicadas
 
 | Regla | Aplicación |
 |---|---|
@@ -341,7 +482,7 @@ correlación** que también se devuelve al cliente en las respuestas de error.
 
 ---
 
-## 11. Documentación adicional
+## 12. Documentación adicional
 
 - [`docs/REPORTE-TECNICO.md`](docs/REPORTE-TECNICO.md) — arquitectura,
   metodologías, tecnologías empleadas y justificación de cada decisión.
@@ -350,7 +491,7 @@ correlación** que también se devuelve al cliente en las respuestas de error.
 
 ---
 
-## 12. Notas de entrega
+## 13. Notas de entrega
 
 - El **logotipo institucional** se dibuja como SVG en línea
   (`frontend/src/components/BrandLogo.tsx`) para no depender de un recurso

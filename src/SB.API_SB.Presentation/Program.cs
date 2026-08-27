@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using SB.API_SB.Application.Interfaces.Security;
 using SB.API_SB.Infrastructure;
+using SB.API_SB.Infrastructure.EventLog;
 using SB.API_SB.Infrastructure.FlatFileStorage;
 using SB.API_SB.Infrastructure.Persistence.Seeding;
 using SB.API_SB.Presentation.Configuration;
@@ -69,6 +70,7 @@ internal static class PresentationStartupExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
         services.AddSingleton<IFlatFilePathResolver, FlatFilePathResolver>();
+        services.AddSingleton<IEventLogPathResolver, EventLogPathResolver>();
 
         services
             .AddControllers(mvcOptions =>

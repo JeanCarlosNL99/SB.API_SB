@@ -33,6 +33,15 @@ public sealed class ApplicationDbContext : DbContext, IUnitOfWork
     /// <summary>Empleados, incluidos todos sus subtipos.</summary>
     public DbSet<Employee> Employees => Set<Employee>();
 
+    /// <summary>Companias para las que se calcula la nomina.</summary>
+    public DbSet<Company> Companies => Set<Company>();
+
+    /// <summary>Ejecuciones de nomina generadas.</summary>
+    public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+
+    /// <summary>Lineas de las ejecuciones de nomina.</summary>
+    public DbSet<PayrollRunLine> PayrollRunLines => Set<PayrollRunLine>();
+
     /// <summary>Departamentos organizacionales.</summary>
     public DbSet<Department> Departments => Set<Department>();
 

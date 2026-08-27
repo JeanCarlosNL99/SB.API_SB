@@ -107,3 +107,63 @@ Authorization: Bearer {{token}}
 ### Consultar roles disponibles
 GET {{baseUrl}}/api/usuarios/roles
 Authorization: Bearer {{token}}
+
+### Consultar companias
+GET {{baseUrl}}/api/companias
+Authorization: Bearer {{token}}
+
+### Crear compania
+POST {{baseUrl}}/api/companias
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Compania de Ejemplo, S. A.",
+  "taxIdentificationNumber": "101-99999-9"
+}
+
+### Vista previa del calculo de una semana (no persiste nada)
+GET {{baseUrl}}/api/nomina/vista-previa?companyId=REEMPLAZAR_POR_GUID&year=2026&weekNumber=34&onlyActiveEmployees=true
+Authorization: Bearer {{token}}
+
+### Semanas ya pagadas por la compania en el ano
+GET {{baseUrl}}/api/nomina/semanas-generadas?companyId=REEMPLAZAR_POR_GUID&year=2026
+Authorization: Bearer {{token}}
+
+### Generar el pago de la semana
+# Repetir esta peticion devuelve HTTP 409: una semana solo se paga una vez.
+POST {{baseUrl}}/api/nomina/ejecuciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyId": "REEMPLAZAR_POR_GUID",
+  "year": 2026,
+  "weekNumber": 34,
+  "onlyActiveEmployees": true
+}
+
+### Historial de pagos semanales
+GET {{baseUrl}}/api/nomina/ejecuciones?year=2026&includeCancelled=true&pageNumber=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Detalle de una nomina generada
+GET {{baseUrl}}/api/nomina/ejecuciones/REEMPLAZAR_POR_GUID
+Authorization: Bearer {{token}}
+
+### Anular una nomina (requiere rol Administrador)
+POST {{baseUrl}}/api/nomina/ejecuciones/REEMPLAZAR_POR_GUID/anular
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reason": "Se cargaron horas incorrectas en el periodo."
+}
+
+### Archivos del registro de eventos (requiere rol Administrador)
+GET {{baseUrl}}/api/registro-eventos/archivos
+Authorization: Bearer {{token}}
+
+### Registro de eventos filtrado (requiere rol Administrador)
+GET {{baseUrl}}/api/registro-eventos?minimumLevel=Warning&maximumEntries=50
+Authorization: Bearer {{token}}

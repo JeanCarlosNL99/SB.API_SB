@@ -31,9 +31,13 @@ public sealed class EmployeeServiceTests
     private static readonly Guid INACTIVE_DEPARTMENT_ID =
         Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
+    private static readonly Guid COMPANY_ID =
+        Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     private readonly IEmployeeRepository employeeRepository = Substitute.For<IEmployeeRepository>();
     private readonly IDepartmentRepository departmentRepository =
         Substitute.For<IDepartmentRepository>();
+    private readonly ICompanyRepository companyRepository = Substitute.For<ICompanyRepository>();
     private readonly IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly EmployeeService employeeService;
 
@@ -59,9 +63,19 @@ public sealed class EmployeeServiceTests
                 IsActive = false
             });
 
+        companyRepository
+            .GetByIdAsync(COMPANY_ID, Arg.Any<CancellationToken>())
+            .Returns(new Company
+            {
+                Id = COMPANY_ID,
+                Name = "Servicios Financieros del Caribe, S. A.",
+                IsActive = true
+            });
+
         employeeService = new EmployeeService(
             employeeRepository,
             departmentRepository,
+            companyRepository,
             EmployeeTypeHandlerResolverFactory.Create(),
             unitOfWork,
             NullLogger<EmployeeService>.Instance);
@@ -152,7 +166,8 @@ public sealed class EmployeeServiceTests
                 Id = employeeId,
                 PaternalLastName = "Diaz",
                 SocialSecurityNumber = "001-9999999-9",
-                DepartmentId = ACTIVE_DEPARTMENT_ID,
+                CompanyId = COMPANY_ID,
+        DepartmentId = ACTIVE_DEPARTMENT_ID,
                 HourlyWage = 300m,
                 HoursWorked = 45m
             });
@@ -163,7 +178,8 @@ public sealed class EmployeeServiceTests
             FirstName = "Juan",
             PaternalLastName = "Diaz",
             SocialSecurityNumber = "001-9999999-9",
-            DepartmentId = ACTIVE_DEPARTMENT_ID,
+            CompanyId = COMPANY_ID,
+        DepartmentId = ACTIVE_DEPARTMENT_ID,
             Status = EmployeeStatus.Active,
             WeeklySalary = 40_000m
         };
@@ -182,7 +198,8 @@ public sealed class EmployeeServiceTests
             Id = employeeId,
             PaternalLastName = "Diaz",
             SocialSecurityNumber = "001-9999999-9",
-            DepartmentId = ACTIVE_DEPARTMENT_ID,
+            CompanyId = COMPANY_ID,
+        DepartmentId = ACTIVE_DEPARTMENT_ID,
             HourlyWage = 300m,
             HoursWorked = 40m
         };
@@ -200,7 +217,8 @@ public sealed class EmployeeServiceTests
             Type = EmployeeType.Hourly,
             PaternalLastName = "Diaz",
             SocialSecurityNumber = "001-9999999-9",
-            DepartmentId = ACTIVE_DEPARTMENT_ID,
+            CompanyId = COMPANY_ID,
+        DepartmentId = ACTIVE_DEPARTMENT_ID,
             Status = EmployeeStatus.Active,
             HourlyWage = 300m,
             HoursWorked = 50m
@@ -225,7 +243,8 @@ public sealed class EmployeeServiceTests
         EmployeeFilterRequest filter = new()
         {
             Name = "Diaz",
-            DepartmentId = ACTIVE_DEPARTMENT_ID,
+            CompanyId = COMPANY_ID,
+        DepartmentId = ACTIVE_DEPARTMENT_ID,
             Status = EmployeeStatus.Active,
             PageNumber = 2,
             PageSize = 25
@@ -261,6 +280,7 @@ public sealed class EmployeeServiceTests
         Type = EmployeeType.Hourly,
         PaternalLastName = "Diaz",
         SocialSecurityNumber = "001-9999999-9",
+        CompanyId = COMPANY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
         Status = EmployeeStatus.Active,
         HourlyWage = 300m,

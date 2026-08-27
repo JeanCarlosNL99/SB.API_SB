@@ -15,6 +15,7 @@ public sealed class DatabaseInitializer
 {
     private readonly ApplicationDbContext databaseContext;
     private readonly DatabaseSeeder databaseSeeder;
+    private readonly PayrollHistorySeeder payrollHistorySeeder;
     private readonly GovernmentEntityFileInitializer flatFileInitializer;
     private readonly DatabaseOptions options;
     private readonly ILogger<DatabaseInitializer> logger;
@@ -22,6 +23,7 @@ public sealed class DatabaseInitializer
     public DatabaseInitializer(
         ApplicationDbContext databaseContext,
         DatabaseSeeder databaseSeeder,
+        PayrollHistorySeeder payrollHistorySeeder,
         GovernmentEntityFileInitializer flatFileInitializer,
         IOptions<DatabaseOptions> options,
         ILogger<DatabaseInitializer> logger)
@@ -30,6 +32,7 @@ public sealed class DatabaseInitializer
 
         this.databaseContext = databaseContext;
         this.databaseSeeder = databaseSeeder;
+        this.payrollHistorySeeder = payrollHistorySeeder;
         this.flatFileInitializer = flatFileInitializer;
         this.options = options.Value;
         this.logger = logger;
@@ -59,5 +62,9 @@ public sealed class DatabaseInitializer
             schemaWasCreated);
 
         await databaseSeeder.SeedAsync(cancellationToken);
+
+        // El historial de nomina se siembra despues de los empleados porque se
+        // calcula a partir de ellos.
+        await payrollHistorySeeder.SeedAsync(cancellationToken);
     }
 }

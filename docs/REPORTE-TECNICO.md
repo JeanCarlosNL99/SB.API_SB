@@ -19,12 +19,13 @@ razonamiento detrás de cada una.
 | Validaciones | FluentValidation con reglas condicionales por tipo |
 | Registro de eventos | Serilog (consola + archivo diario) |
 | Documentación | Swagger / OpenAPI con esquema de seguridad Bearer |
-| Pruebas | xUnit + NSubstitute — 77 pruebas |
+| Pruebas | xUnit + NSubstitute — 98 pruebas |
 | Frontend | React 18 + TypeScript 5 + Vite 5 |
 | Cliente HTTP | Axios con interceptores |
 
-Volumen: **≈ 100 archivos de código**, 5 proyectos .NET, 1 proyecto de pruebas y
-1 aplicación web. 181 entidades gubernamentales cargadas del listado oficial.
+Volumen: **≈ 130 archivos de código**, 5 proyectos .NET, 1 proyecto de pruebas y
+1 aplicación web. 181 entidades gubernamentales cargadas del listado oficial y un
+historial de nómina sembrado de 24 ejecuciones.
 
 ---
 
@@ -58,7 +59,7 @@ Volumen: **≈ 100 archivos de código**, 5 proyectos .NET, 1 proyecto de prueba
 |---|---|---|---|
 | Dominio | `SB.API_SB.Domain` | Entidades, jerarquía de empleados con sus fórmulas, enums, constantes de negocio, excepciones, interfaces de repositorio | Ninguna referencia a proyectos ni paquetes externos |
 | Aplicación | `SB.API_SB.Application` | DTO de entrada y salida, interfaces de servicio, validadores, mapeos, abstracciones de reloj y seguridad | Implementaciones, SQL, HTTP |
-| Servicios | `SB.API_SB.Services` | Implementación de los casos de uso, manejadores por tipo de empleado, generación del reporte | Sentencias SQL, acceso a archivos |
+| Servicios | `SB.API_SB.Services` | Implementación de los casos de uso, manejadores por tipo de empleado, cálculo y generación de la nómina, lectura del registro | Sentencias SQL, acceso a archivos |
 | Infraestructura | `SB.API_SB.Infrastructure` | `DbContext`, configuraciones de mapeo, repositorios, repositorio de texto plano, generador de JWT, hasher | Reglas de negocio |
 | Presentación | `SB.API_SB.Presentation` | Controladores, middleware de excepciones, filtro de validación, Swagger, CORS, políticas de autorización | Reglas de negocio, acceso directo a datos |
 
@@ -80,7 +81,7 @@ proyecto:
    gubernamentales viven en un archivo de texto y los empleados en una base
    relacional. Ningún servicio distingue una de otra porque ambas satisfacen
    contratos del Dominio.
-3. **Las reglas de negocio se prueban sin infraestructura.** De las 77 pruebas,
+3. **Las reglas de negocio se prueban sin infraestructura.** De las 98 pruebas,
    ninguna necesita una base de datos ni un servidor web (la única que toca disco
    es la del repositorio de texto plano, y por diseño: verifica precisamente ese
    viaje).
@@ -147,9 +148,9 @@ multiplicación. La fórmula de comisión existe una sola vez en todo el sistema
 
 | Principio | Dónde se aplica | Evidencia |
 |---|---|---|
-| **S** — Responsabilidad única | `PayrollReportService` solo agrega y totaliza; el cálculo lo hace cada empleado. `ExceptionHandlingMiddleware` solo traduce errores. | Ningún servicio contiene una fórmula de nómina. |
-| **O** — Abierto/cerrado | Agregar un quinto tipo de contrato = nueva subclase + nuevo `IEmployeeTypeHandler` + una línea de registro. | Ni `EmployeeService`, ni `PayrollReportService`, ni los controladores cambian. |
-| **L** — Sustitución de Liskov | Toda `Employee` responde a `CalculateWeeklyPayment()` con un contrato idéntico: monto no negativo, redondeado a dos decimales. | El reporte recorre la colección sin comprobar tipos. |
+| **S** — Responsabilidad única | `PayrollCalculator` traduce empleados a líneas; `PayrollRunService` decide y persiste; el cálculo lo hace cada empleado. | Ningún servicio contiene una fórmula de nómina. |
+| **O** — Abierto/cerrado | Agregar un quinto tipo de contrato = nueva subclase + nuevo `IEmployeeTypeHandler` + una línea de registro. | Ni `EmployeeService`, ni `PayrollCalculator`, ni los controladores cambian. |
+| **L** — Sustitución de Liskov | Toda `Employee` responde a `CalculateWeeklyPayment()` con un contrato idéntico: monto no negativo, redondeado a dos decimales. | El cálculo de nómina recorre la colección sin comprobar tipos. |
 | **I** — Segregación de interfaces | `IEmployeeRepository`, `IUserRepository`, `IPasswordHasher`, `IJwtTokenGenerator`, `IDateTimeProvider` son pequeñas y específicas. | Ninguna clase implementa métodos que no usa. |
 | **D** — Inversión de dependencias | Los contratos viven en Dominio/Aplicación; las implementaciones en Infraestructura. | El `.csproj` del Dominio no tiene dependencias. |
 
@@ -187,7 +188,149 @@ arreglo.
 
 ---
 
-## 4. La base de datos de texto plano
+## 4. El módulo de pagos semanales
+
+Es el caso de uso central del enunciado: *calcular los pagos semanales de los
+empleados de la compañía*. Merece una sección propia porque su diseño no es una
+consulta más, sino un documento contable.
+
+### 4.1 Un pago semanal es un documento, no una consulta
+
+La diferencia es la decisión de diseño más importante del módulo.
+
+| Enfoque | Consecuencia |
+|---|---|
+| **Consulta** — recalcular la nómina de una semana cada vez que se consulta | La nómina de hace dos meses cambiaría cada vez que alguien edita un empleado. No hay evidencia de lo que se pagó. |
+| **Documento** (implementado) — la generación produce una instantánea que se almacena | El histórico es inmutable. Si mañana cambian las horas de un empleado, la nómina de la semana pasada sigue mostrando lo que realmente se pagó. |
+
+Por eso `PayrollRunLine` **copia** el nombre del empleado, su número de seguro
+social, su tipo de contrato, su departamento, el monto, la fórmula aplicada y cada
+componente del desglose. No son datos duplicados por descuido: son la instantánea.
+La referencia al empleado es opcional y con `DeleteBehavior.SetNull`, de modo que
+eliminar a un empleado no borra la evidencia de lo que se le pagó.
+
+### 4.2 La identidad de la semana
+
+Una semana se identifica por el par `(año ISO, número de semana)`, no por un rango
+de fechas. La razón es la unicidad: dos peticiones que describan la misma semana
+producen exactamente la misma clave, sin importar con qué fecha del periodo se
+hayan construido.
+
+El objeto de valor `PayrollWeek` encapsula la norma ISO 8601, incluido el caso que
+suele romper las implementaciones caseras: **el año de la semana puede no coincidir
+con el año del calendario**. El 31 de diciembre de 2025 pertenece a la semana 1 del
+año ISO 2026, y `PayrollWeek.FromDate` lo resuelve correctamente. También valida
+que la semana exista: 2025 tiene 52 semanas, por lo que `Create(2025, 53)` se
+rechaza, mientras que 2026 sí tiene 53.
+
+### 4.3 Una semana solo se paga una vez, en tres niveles
+
+El requisito de no poder regenerar una semana ya pagada se aplica en tres lugares
+independientes, y cada uno resuelve un problema distinto:
+
+| Nivel | Mecanismo | Qué problema resuelve |
+|---|---|---|
+| **Interfaz** | La vista previa consulta el estado de la semana y deshabilita el botón | Evita que el usuario intente una operación que va a fallar. |
+| **Servicio** | Comprueba la existencia y lanza `DuplicatedPayrollRunException` → HTTP 409 con el identificador de la nómina existente | Da un mensaje que explica la regla y permite ir al documento existente. |
+| **Base de datos** | Índice único filtrado `IX_PayrollRuns_Company_Year_Week_Vigente` sobre `(CompanyId, Year, WeekNumber) WHERE Status = 1` | Cierra la ventana de la condición de carrera entre dos peticiones simultáneas. |
+
+**El tercer nivel es el que de verdad garantiza la regla.** La comprobación del
+servicio consulta y luego inserta; entre ambas operaciones cabe otra petición. Sin
+el índice, la validación sería una ilusión de seguridad bajo concurrencia.
+
+El filtro del índice (`WHERE Status = 1`) es lo que hace posible la anulación: al
+marcar una ejecución como anulada sale del índice y la semana queda libre para
+recalcularse, sin perder el documento anulado. El predicado usa comillas dobles
+como delimitador de identificador porque las admiten tanto SQLite como SQL Server,
+manteniendo el índice portable entre los dos proveedores.
+
+### 4.4 La vista previa y la generación comparten el cálculo
+
+`IPayrollCalculator` es la única pieza que traduce empleados a líneas de nómina, y
+la usan las dos rutas. Que compartan el mismo código no es una economía: es la
+garantía de que **lo que el usuario revisa antes de generar es idéntico a lo que
+queda almacenado**. Una prueba lo fija explícitamente
+(`PreviewAsync_YGenerateAsync_ProducenExactamenteElMismoCalculo`).
+
+El cálculo en sí sigue ocurriendo en el dominio: `PayrollCalculator` pide a cada
+empleado su propio pago y su propio desglose. No contiene ninguna fórmula.
+
+### 4.5 Reglas adicionales del negocio
+
+| Regla | Motivo |
+|---|---|
+| No se puede generar la nómina de una semana que aún no ha comenzado | Las horas trabajadas y las ventas de esa semana todavía no existen. |
+| No se puede generar la nómina de una compañía sin empleados | Un documento de pago vacío no significa nada. |
+| No se puede generar la nómina de una compañía inactiva | Una compañía dada de baja no paga. |
+| Anular exige un motivo de al menos 10 caracteres | La anulación queda como evidencia; «error» no explica nada. |
+| Solo un administrador puede anular | Es la operación que permite reescribir un pago ya emitido. |
+| No se puede eliminar una compañía con nóminas en el historial | El historial de pagos debe conservarse. |
+
+### 4.6 Datos de demostración del historial
+
+`PayrollHistorySeeder` genera, en el primer arranque, las **ocho semanas anteriores
+a la actual para cada una de las tres compañías**: 24 ejecuciones con sus líneas y
+componentes.
+
+Las semanas históricas no se calculan con los datos vigentes de cada empleado: se
+aplica una variación por semana a las horas trabajadas y a las ventas, de modo que
+el historial se parezca a uno real, donde cada semana difiere de la anterior. El
+salario fijo no varía, porque en la realidad tampoco varía. La variación se deriva
+del número de semana con una fórmula determinista y **no de un generador
+aleatorio**: el sembrado es reproducible, lo que importa cuando alguien pregunta
+por qué un total no coincide con lo que vio ayer.
+
+La semana en curso y la anterior se dejan deliberadamente sin generar, para que el
+evaluador pueda probar el flujo completo de generación.
+
+---
+
+## 5. El registro de eventos consultable
+
+El requisito pedía manejo de logs con Serilog o similar, y un tab de logs visible
+solo para el administrador. La implementación resuelve dos problemas concretos.
+
+### 5.1 Dos formatos, cada uno para su lector
+
+Serilog escribe el mismo evento en dos archivos:
+
+| Archivo | Formato | Para quién |
+|---|---|---|
+| `sb-api-sb-AAAAMMDD.log` | Texto con plantilla legible | Una persona en una terminal |
+| `sb-api-sb-AAAAMMDD.json` | JSON por línea (`RenderedCompactJsonFormatter`) | La propia aplicación |
+
+La pantalla lee el **JSON**. Analizar registro estructurado es fiable; aplicar
+expresiones regulares al archivo de texto se rompe con el primer mensaje que
+contenga un salto de línea o una traza de excepción. Es la diferencia entre un
+visor que funciona y uno que funciona hasta que ocurre un error interesante.
+
+Durante la implementación se detectó que `CompactJsonFormatter` escribe la
+*plantilla* del mensaje (`{PayrollRunId} anulada`) y no el mensaje renderizado. Se
+cambió a `RenderedCompactJsonFormatter`, que sí escribe el texto final.
+
+### 5.2 Memoria acotada, independiente del tamaño del archivo
+
+`SerilogFileEventLogReader` recorre el archivo secuencialmente conservando solo una
+ventana de las últimas *N* líneas en una cola. El consumo de memoria depende de la
+cantidad de entradas que se van a devolver, **no del tamaño del archivo**: un
+registro diario de 50 MB se lee sin cargarlo entero.
+
+El archivo se abre con `FileShare.ReadWrite | FileShare.Delete` porque Serilog lo
+está escribiendo en ese momento: abrirlo en exclusiva bloquearía el propio registro
+de la aplicación.
+
+### 5.3 Seguridad de la pantalla
+
+| Medida | Motivo |
+|---|---|
+| Todo el controlador exige la política `SoloAdministracion` | El registro contiene rutas internas, trazas y nombres de usuario: es información de diagnóstico. |
+| El nombre de archivo recibido se resuelve **contra el listado de archivos existentes**, nunca se combina con la ruta | Una ruta relativa como `../../appsettings.json` permitiría leer cualquier archivo del servidor. Verificado: solo se admiten nombres del listado. |
+| El menú oculta la opción para quien no es administrador | Comodidad; la autorización real la aplica la API. |
+
+Verificado con un usuario de rol Consultor: `GET /api/registro-eventos` responde
+**403**, y la opción no aparece en el menú.
+
+## 6. La base de datos de texto plano
 
 El requerimiento pide un archivo de texto plano dentro del proyecto. Un archivo
 de texto no ofrece transacciones, ni control de concurrencia, ni integridad
@@ -230,7 +373,7 @@ durante las pruebas de un desarrollador no entran al control de versiones.
 
 ---
 
-## 5. Persistencia relacional con Entity Framework Core
+## 7. Persistencia relacional con Entity Framework Core
 
 ### 5.1 Estrategia de herencia: Table Per Hierarchy
 
@@ -301,7 +444,7 @@ entidad futura queda cubierta automáticamente.
 
 ---
 
-## 6. Seguridad
+## 8. Seguridad
 
 ### 6.1 Autenticación JWT
 
@@ -364,7 +507,7 @@ alguien se acuerde" y "seguro salvo que alguien lo decida".
 
 ---
 
-## 7. Validaciones
+## 9. Validaciones
 
 ### 7.1 Validaciones condicionales por tipo
 
@@ -409,7 +552,7 @@ La validación del cliente es comodidad; la de la API es la que decide.
 
 ---
 
-## 8. Manejo de excepciones
+## 10. Manejo de excepciones
 
 Un middleware traduce cada excepción a `ProblemDetails` (RFC 7807):
 
@@ -438,7 +581,7 @@ y garantiza que **toda** respuesta de error tenga el mismo formato.
 
 ---
 
-## 9. Registro de eventos con Serilog
+## 11. Registro de eventos con Serilog
 
 Configurado por completo desde `appsettings.json`, de modo que los niveles y
 destinos se cambian sin recompilar. Dos destinos: consola y archivo diario con
@@ -464,7 +607,7 @@ usuario y la dirección del cliente.
 
 ---
 
-## 10. Documentación con Swagger
+## 12. Documentación con Swagger
 
 Además del listado de endpoints:
 
@@ -479,7 +622,7 @@ Además del listado de endpoints:
 
 ---
 
-## 11. Pruebas
+## 13. Pruebas
 
 77 pruebas unitarias con **xUnit** y **NSubstitute**.
 
@@ -508,7 +651,7 @@ directorio del proyecto: pruebas frágiles y con efectos secundarios.
 
 ---
 
-## 12. Frontend: React + TypeScript
+## 14. Frontend: React + TypeScript
 
 ### 12.1 Decisiones y su justificación
 
@@ -575,7 +718,7 @@ los datos realmente almacenados, no de una lista fija en el cliente.
 
 ---
 
-## 13. Rendimiento
+## 15. Rendimiento
 
 | Requisito | Cumplimiento |
 |---|---|
@@ -586,7 +729,7 @@ los datos realmente almacenados, no de una lista fija en el cliente.
 
 ---
 
-## 14. Mantenibilidad y escalabilidad
+## 16. Mantenibilidad y escalabilidad
 
 ### 14.1 Cómo se agrega un quinto tipo de empleado
 
@@ -635,7 +778,7 @@ verificable.
 
 ---
 
-## 15. Cumplimiento de los requerimientos
+## 17. Cumplimiento de los requerimientos
 
 | Requerimiento | Estado | Dónde |
 |---|---|---|
@@ -646,38 +789,44 @@ verificable.
 | Autenticación Bearer JWT | ✅ | `JwtTokenGenerator`, `AuthenticationConfiguration` |
 | Base de datos de texto plano en el proyecto | ✅ | `src/SB.API_SB.Presentation/Database/` |
 | Mantenimiento de entidades gubernamentales | ✅ | 181 registros del listado oficial, CRUD completo |
-| Manejo de logs (Serilog) | ✅ | Consola + archivo diario |
+| Manejo de logs (Serilog) | ✅ | Consola + archivo de texto + archivo JSON diarios |
 | Documentación (Swagger) | ✅ | `/swagger`, con esquema Bearer |
 | Manejo de excepciones | ✅ | Middleware con `ProblemDetails` |
 | Entrega en repositorio Git | ✅ | Repositorio con `.gitignore` |
-| **Nomenclatura (11 reglas)** | ✅ | Tabla de verificación en el README, sección 10 |
+| **Nomenclatura (11 reglas)** | ✅ | Tabla de verificación en el README, sección 11 |
 | Gestión de empleados | ✅ | CRUD completo desde la interfaz |
-| Filtros por nombre, departamento y estado | ✅ | Resueltos en la base de datos |
+| Filtros por nombre, compañía, departamento y estado | ✅ | Resueltos en la base de datos |
 | Gestión de usuarios con roles | ✅ | Tres roles, muchos a muchos, JWT |
 | Cálculo de pago por los cuatro tipos | ✅ | Polimorfismo en el Dominio |
 | Recálculo al actualizar | ✅ | `EmployeeService.UpdateAsync` |
 | Reporte semanal con detalle del cálculo | ✅ | Fórmula y componentes por empleado |
+| **Empleados asociados a una compañía** | ✅ | `Employee.CompanyId`, filtro y columna en la interfaz |
+| **Mecanismo de cálculo de pagos semanales** | ✅ | `POST /api/nomina/ejecuciones`, pantalla *Calcular pago semanal* |
+| **Historial de cálculos anteriores** | ✅ | `GET /api/nomina/ejecuciones`, pantalla *Historial de pagos* |
+| **Datos dummy en el historial** | ✅ | `PayrollHistorySeeder`: 24 ejecuciones sembradas |
+| **No regenerar una semana ya pagada** | ✅ | Tres niveles: interfaz, servicio (HTTP 409) e índice único filtrado |
+| **Tab de logs solo para el administrador** | ✅ | `RegistroEventosController` con política `SoloAdministracion`; verificado 403 con rol Consultor |
 | Backend .NET 8 + EF Core | ✅ | EF Core 8, TPH, índices, relaciones |
 | Frontend React + TypeScript | ✅ | React 18, TypeScript estricto, Vite |
 | Base de datos SQL Server u Oracle | ✅ | SQL Server configurado; SQLite para ejecución inmediata |
 | Maqueta y colores institucionales | ✅ | Verificado en el navegador |
 | Validaciones de datos | ✅ | Cuatro barreras |
-| Pruebas unitarias (mínimo 2–3) | ✅ | **77** |
+| Pruebas unitarias (mínimo 2–3) | ✅ | **98** |
 | README con instrucciones | ✅ | Este repositorio |
 | La aplicación loguea todo | ✅ | Peticiones, operaciones, errores, autenticación |
 
 ---
 
-## 16. Verificación realizada
+## 18. Verificación realizada
 
 La solución no se entrega solo compilada: se ejecutó de extremo a extremo.
 
 | Verificación | Resultado |
 |---|---|
 | `dotnet build` de la solución | Sin errores ni advertencias |
-| `dotnet test` | 77/77 pruebas aprobadas |
+| `dotnet test` | 98/98 pruebas aprobadas |
 | `npm run typecheck` y `npm run lint` | Sin errores ni advertencias |
-| `npm run build` | 108 módulos, 261 KB (82 KB comprimido) |
+| `npm run build` | 117 módulos, 294 KB (89 KB comprimido) |
 | Inicio de sesión desde el portal | Token emitido, sesión establecida |
 | Carga del listado oficial | 181 entidades, acentos correctos |
 | Alta de entidad desde la interfaz | Persistida en el archivo plano con el usuario responsable |
@@ -686,19 +835,36 @@ La solución no se entrega solo compilada: se ejecutó de extremo a extremo.
 | Eliminación de entidad | HTTP 204, registro eliminado, respaldo generado |
 | Alta de empleado desde la interfaz | Formulario adaptado al tipo; pago calculado correctamente |
 | Recálculo al editar horas | 45 h → RD$14,250; 50 h → RD$16,500 |
-| Reporte semanal | Totales y desglose verificados a mano |
+| Generación de nómina desde la interfaz | HTTP 201, documento almacenado con su desglose |
+| **Reintento de la misma semana** | **HTTP 409** con el identificador de la nómina existente |
+| Botón de generar con la semana ya pagada | Deshabilitado, con el motivo en el título |
+| Anulación y regeneración de la semana | HTTP 200 y luego HTTP 201: la semana queda libre |
+| Historial sembrado | 24 ejecuciones, 8 semanas por compañía, montos distintos por semana |
+| Detalle de una nómina histórica | Instantánea con fórmula y componentes de cada empleado |
+| Registro de eventos como administrador | Archivos, conteo por nivel y traza de excepción visibles |
+| Registro de eventos con rol Consultor | **HTTP 403** y la opción no aparece en el menú |
 | Petición sin token / con token inválido | HTTP 401 |
 | Validación por tipo | HTTP 400 con los errores del campo correspondiente |
 | Colores institucionales en el navegador | `rgba(13, 48, 72, 0.9)` y `rgb(237, 240, 247)` |
 
-**Un defecto encontrado y corregido durante esta verificación:** las fechas leídas
-de la base de datos llegaban al cliente sin marca de zona y se mostraban con el
-desfase de la zona horaria local. Se corrigió con un `ValueConverter` de UTC
-aplicado a todo el modelo (sección 5.5).
+**Cuatro defectos encontrados y corregidos durante la verificación:**
+
+1. Las fechas leídas de la base de datos llegaban al cliente sin marca de zona y se
+   mostraban con el desfase de la zona horaria local. Se corrigió con un
+   `ValueConverter` de UTC aplicado a todo el modelo (sección 7.5).
+2. El intento de pagar dos veces una semana devolvía **HTTP 500** en lugar de 409:
+   el middleware de excepciones no conocía la excepción nueva. Se agregó su
+   traducción, con el identificador de la nómina existente en la respuesta.
+3. Los mensajes del registro salían como *plantilla* (`{PayrollRunId} anulada`) en
+   lugar de renderizados. `CompactJsonFormatter` escribe la plantilla; se cambió a
+   `RenderedCompactJsonFormatter`.
+4. Las fechas de periodo sin hora (`2026-08-24`) se mostraban un día antes en el
+   portal: `new Date("2026-08-24")` las interpreta como medianoche UTC. Se corrigió
+   interpretando las fechas sin hora como fechas locales.
 
 ---
 
-## 17. Decisiones que merecen comentario
+## 19. Decisiones que merecen comentario
 
 **1. Dos almacenes de datos.** El documento pide, en secciones distintas, un
 archivo de texto plano y SQL Server u Oracle. Se cumplieron ambas exigencias
@@ -736,7 +902,7 @@ mayor, sin cambiar el `TargetFramework`.
 
 ---
 
-## 18. Qué añadiría en un proyecto de producción
+## 20. Qué añadiría en un proyecto de producción
 
 Fuera del alcance de una prueba técnica, pero parte de una respuesta honesta:
 

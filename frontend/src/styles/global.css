@@ -520,6 +520,11 @@ table {
   background-color: rgba(13, 48, 72, 0.09);
 }
 
+.badge--danger-level {
+  color: var(--color-danger);
+  background-color: var(--color-danger-surface);
+}
+
 .badge--role {
   color: var(--color-accent-dark);
   background-color: rgba(226, 87, 30, 0.12);
@@ -897,4 +902,24 @@ table {
   .app-panel {
     padding: var(--spacing-base);
   }
+}
+
+/*
+ * Traza de excepcion del registro de eventos. Se muestra en monoespaciada con
+ * desplazamiento propio: una traza puede tener cientos de caracteres por linea y
+ * no debe ensanchar la pagina.
+ */
+.stack-trace {
+  max-height: 340px;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-text);
+  background-color: var(--color-gray);
+  border-radius: var(--radius-control);
+  white-space: pre-wrap;
+  word-break: break-word;
 }

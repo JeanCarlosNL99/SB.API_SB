@@ -125,6 +125,8 @@ export interface Employee {
   typeDescription: string;
   status: EmployeeStatus;
   statusDescription: string;
+  companyId: string;
+  companyName: string;
   departmentId: string;
   departmentName: string;
   weeklySalary?: number | null;
@@ -145,6 +147,7 @@ export interface EmployeeRequest {
   firstName?: string | null;
   paternalLastName: string;
   socialSecurityNumber: string;
+  companyId: string;
   departmentId: string;
   status: EmployeeStatus;
   weeklySalary?: number | null;
@@ -158,6 +161,7 @@ export interface EmployeeRequest {
 /** Filtros de la consulta de empleados. */
 export interface EmployeeFilter {
   name?: string;
+  companyId?: string;
   departmentId?: string;
   status?: EmployeeStatus | '';
   type?: EmployeeType | '';
@@ -165,35 +169,11 @@ export interface EmployeeFilter {
   pageSize: number;
 }
 
-/** Linea del reporte semanal de nomina. */
-export interface PayrollReportLine {
-  employeeId: string;
-  fullName: string;
-  socialSecurityNumber: string;
-  type: EmployeeType;
-  typeDescription: string;
-  departmentName: string;
-  status: EmployeeStatus;
-  weeklyPayment: number;
-  paymentBreakdown: PaymentBreakdown;
-}
-
-/** Total agregado del reporte de nomina. */
+/** Total agregado de nomina para un agrupamiento determinado. */
 export interface PayrollSummaryItem {
   groupName: string;
   employeeCount: number;
   totalWeeklyPayment: number;
-}
-
-/** Reporte semanal de nomina. */
-export interface WeeklyPayrollReport {
-  generatedAtUtc: string;
-  onlyActiveEmployees: boolean;
-  employeeCount: number;
-  totalWeeklyPayment: number;
-  lines: PayrollReportLine[];
-  totalsByType: PayrollSummaryItem[];
-  totalsByDepartment: PayrollSummaryItem[];
 }
 
 /** Rol de seguridad. */
@@ -240,4 +220,170 @@ export interface ProblemDetails {
   errorCode?: string;
   correlationId?: string;
   errors?: Record<string, string[]>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Companias y calculo de pagos semanales                              */
+/* ------------------------------------------------------------------ */
+
+/** Estado de una ejecucion de nomina. */
+export type PayrollRunStatus = 'Generated' | 'Cancelled';
+
+/** Compania para la que se calcula la nomina. */
+export interface Company {
+  id: string;
+  name: string;
+  taxIdentificationNumber: string;
+  isActive: boolean;
+  activeEmployeeCount: number;
+  createdAt: string;
+}
+
+/** Datos para crear una compania. */
+export interface CreateCompanyRequest {
+  name: string;
+  taxIdentificationNumber: string;
+}
+
+/** Datos para actualizar una compania. */
+export interface UpdateCompanyRequest extends CreateCompanyRequest {
+  isActive: boolean;
+}
+
+/** Datos para generar la nomina de una semana. */
+export interface GeneratePayrollRunRequest {
+  companyId: string;
+  year: number;
+  weekNumber: number;
+  onlyActiveEmployees: boolean;
+}
+
+/** Motivo con el que se anula una ejecucion de nomina. */
+export interface CancelPayrollRunRequest {
+  reason: string;
+}
+
+/** Filtros del historial de nomina. */
+export interface PayrollRunFilter {
+  companyId?: string;
+  year?: number | '';
+  includeCancelled: boolean;
+  pageNumber: number;
+  pageSize: number;
+}
+
+/** Cabecera de una ejecucion de nomina. */
+export interface PayrollRunSummary {
+  id: string;
+  companyId: string;
+  companyName: string;
+  year: number;
+  weekNumber: number;
+  weekLabel: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  status: PayrollRunStatus;
+  statusDescription: string;
+  employeeCount: number;
+  totalAmount: number;
+  generatedAt: string;
+  generatedBy: string;
+  cancellationReason?: string | null;
+  cancelledAt?: string | null;
+}
+
+/** Linea de una ejecucion de nomina. */
+export interface PayrollRunLine {
+  id: string;
+  employeeId?: string | null;
+  employeeFullName: string;
+  socialSecurityNumber: string;
+  employeeType: EmployeeType;
+  employeeTypeDescription: string;
+  departmentName: string;
+  weeklyPayment: number;
+  paymentFormula: string;
+  components: PaymentComponent[];
+}
+
+/** Ejecucion de nomina con su detalle completo. */
+export interface PayrollRunDetail {
+  summary: PayrollRunSummary;
+  lines: PayrollRunLine[];
+  totalsByType: PayrollSummaryItem[];
+  totalsByDepartment: PayrollSummaryItem[];
+}
+
+/** Vista previa del calculo de una semana antes de generarla. */
+export interface PayrollPreview {
+  companyId: string;
+  companyName: string;
+  year: number;
+  weekNumber: number;
+  weekLabel: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  employeeCount: number;
+  totalAmount: number;
+  isAlreadyGenerated: boolean;
+  existingPayrollRunId?: string | null;
+  lines: PayrollRunLine[];
+  totalsByType: PayrollSummaryItem[];
+  totalsByDepartment: PayrollSummaryItem[];
+}
+
+/** Semanas ya pagadas por una compania en un ano. */
+export interface GeneratedWeeks {
+  companyId: string;
+  year: number;
+  weeksInYear: number;
+  generatedWeekNumbers: number[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Registro de eventos                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Nivel de un evento registrado. */
+export type EventLogLevel =
+  | 'Verbose'
+  | 'Debug'
+  | 'Information'
+  | 'Warning'
+  | 'Error'
+  | 'Fatal';
+
+/** Archivo de registro disponible para consulta. */
+export interface EventLogFile {
+  fileName: string;
+  sizeInBytes: number;
+  lastWriteAtUtc: string;
+}
+
+/** Filtros de la consulta del registro de eventos. */
+export interface EventLogFilter {
+  fileName?: string;
+  minimumLevel?: EventLogLevel | '';
+  searchTerm?: string;
+  maximumEntries: number;
+}
+
+/** Entrada individual del registro de eventos. */
+export interface EventLogEntry {
+  timestamp: string;
+  level: EventLogLevel;
+  message: string;
+  correlationId?: string | null;
+  userName?: string | null;
+  sourceContext?: string | null;
+  exception?: string | null;
+}
+
+/** Resultado de la consulta del registro de eventos. */
+export interface EventLogResult {
+  fileName: string;
+  entryCount: number;
+  hasMoreEntries: boolean;
+  countsByLevel: Record<string, number>;
+  entries: EventLogEntry[];
 }

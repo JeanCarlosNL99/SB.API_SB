@@ -35,6 +35,8 @@ public static class EmployeeMappings
             TypeDescription = typeHandler.TypeDescription,
             Status = employee.Status,
             StatusDescription = employee.Status.Describe(),
+            CompanyId = employee.CompanyId,
+            CompanyName = employee.Company?.Name ?? string.Empty,
             DepartmentId = employee.DepartmentId,
             DepartmentName = employee.Department?.Name ?? string.Empty,
             WeeklyPayment = employee.CalculateWeeklyPayment(),
@@ -63,6 +65,7 @@ public static class EmployeeMappings
         employee.FirstName = request.FirstName?.Trim();
         employee.PaternalLastName = request.PaternalLastName.Trim();
         employee.SocialSecurityNumber = request.SocialSecurityNumber.Trim();
+        employee.CompanyId = request.CompanyId;
         employee.DepartmentId = request.DepartmentId;
         employee.Status = request.Status;
     }

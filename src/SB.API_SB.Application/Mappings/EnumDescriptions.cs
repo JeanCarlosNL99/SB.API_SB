@@ -16,6 +16,13 @@ public static class EnumDescriptions
             [EmployeeStatus.Inactive] = "Inactivo"
         };
 
+    private static readonly Dictionary<PayrollRunStatus, string> PAYROLL_RUN_STATUS_DESCRIPTIONS =
+        new()
+        {
+            [PayrollRunStatus.Generated] = "Generada",
+            [PayrollRunStatus.Cancelled] = "Anulada"
+        };
+
     private static readonly Dictionary<RecordStatus, string> RECORD_STATUS_DESCRIPTIONS =
         new()
         {
@@ -28,6 +35,14 @@ public static class EnumDescriptions
     /// <returns>Etiqueta legible del estado.</returns>
     public static string Describe(this EmployeeStatus status) =>
         EMPLOYEE_STATUS_DESCRIPTIONS.TryGetValue(status, out string? description)
+            ? description
+            : status.ToString();
+
+    /// <summary>Obtiene la descripcion del estado de una ejecucion de nomina.</summary>
+    /// <param name="status">Estado a describir.</param>
+    /// <returns>Etiqueta legible del estado.</returns>
+    public static string Describe(this PayrollRunStatus status) =>
+        PAYROLL_RUN_STATUS_DESCRIPTIONS.TryGetValue(status, out string? description)
             ? description
             : status.ToString();
 

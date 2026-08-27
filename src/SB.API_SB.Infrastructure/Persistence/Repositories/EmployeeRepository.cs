@@ -56,16 +56,19 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
         CancellationToken cancellationToken = default) =>
         EntitySet
             .Include(employee => employee.Department)
+            .Include(employee => employee.Company)
             .FirstOrDefaultAsync(employee => employee.Id == employeeId, cancellationToken);
 
     /// <inheritdoc />
     public async Task<IReadOnlyCollection<Employee>> GetForPayrollAsync(
+        Guid companyId,
         bool onlyActiveEmployees,
         CancellationToken cancellationToken = default)
     {
         IQueryable<Employee> query = EntitySet
             .AsNoTracking()
-            .Include(employee => employee.Department);
+            .Include(employee => employee.Department)
+            .Where(employee => employee.CompanyId == companyId);
 
         if (onlyActiveEmployees)
         {
@@ -100,7 +103,8 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
     {
         IQueryable<Employee> query = EntitySet
             .AsNoTracking()
-            .Include(employee => employee.Department);
+            .Include(employee => employee.Department)
+            .Include(employee => employee.Company);
 
         if (!string.IsNullOrWhiteSpace(criteria.Name))
         {
@@ -110,6 +114,11 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
                 EF.Functions.Like(employee.PaternalLastName, $"%{searchTerm}%") ||
                 (employee.FirstName != null &&
                  EF.Functions.Like(employee.FirstName, $"%{searchTerm}%")));
+        }
+
+        if (criteria.CompanyId.HasValue)
+        {
+            query = query.Where(employee => employee.CompanyId == criteria.CompanyId.Value);
         }
 
         if (criteria.DepartmentId.HasValue)

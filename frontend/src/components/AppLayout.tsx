@@ -2,6 +2,9 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuthentication } from '@/hooks/useAuthentication';
 import { BrandLogo } from './BrandLogo';
 import {
+  CompanyIcon,
+  EventLogIcon,
+  HistoryIcon,
   HomeIcon,
   InstitutionIcon,
   LogoutIcon,
@@ -52,8 +55,10 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   {
     label: 'Nomina',
     items: [
+      { to: '/companias', label: 'Companias', icon: <CompanyIcon /> },
       { to: '/empleados', label: 'Empleados', icon: <PeopleIcon /> },
-      { to: '/nomina', label: 'Reporte semanal', icon: <PayrollIcon /> },
+      { to: '/nomina', label: 'Calcular pago semanal', icon: <PayrollIcon /> },
+      { to: '/nomina/historial', label: 'Historial de pagos', icon: <HistoryIcon /> },
     ],
   },
   {
@@ -63,6 +68,12 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
         to: '/usuarios',
         label: 'Usuarios y roles',
         icon: <ShieldIcon />,
+        requiresAdministrator: true,
+      },
+      {
+        to: '/registro-eventos',
+        label: 'Registro de eventos',
+        icon: <EventLogIcon />,
         requiresAdministrator: true,
       },
     ],
@@ -87,9 +98,21 @@ const PAGE_HEADERS: Record<string, { title: string; subtitle: string }> = {
     title: 'Empleados',
     subtitle: 'Gestion de empleados y calculo de pago semanal',
   },
+  '/companias': {
+    title: 'Companias',
+    subtitle: 'Registro de las companias cuya nomina se calcula',
+  },
   '/nomina': {
-    title: 'Reporte semanal de nomina',
-    subtitle: 'Detalle del calculo de pago por tipo de contrato',
+    title: 'Calculo de pago semanal',
+    subtitle: 'Genere la nomina de una semana por compania',
+  },
+  '/nomina/historial': {
+    title: 'Historial de pagos semanales',
+    subtitle: 'Nominas generadas en semanas anteriores',
+  },
+  '/registro-eventos': {
+    title: 'Registro de eventos',
+    subtitle: 'Eventos de la aplicacion registrados por Serilog',
   },
   '/usuarios': {
     title: 'Usuarios y roles',

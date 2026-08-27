@@ -26,6 +26,9 @@ public abstract class EmployeeRequestBase
     /// <summary>Numero de seguro social.</summary>
     public string SocialSecurityNumber { get; set; } = string.Empty;
 
+    /// <summary>Compania que emplea a la persona y paga su nomina.</summary>
+    public Guid CompanyId { get; set; }
+
     /// <summary>Departamento al que se asigna el empleado.</summary>
     public Guid DepartmentId { get; set; }
 

@@ -26,11 +26,16 @@ public interface IEmployeeRepository : IRepository<Employee>
         Guid employeeId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Obtiene los empleados para el reporte semanal de nomina.</summary>
+    /// <summary>
+    /// Obtiene los empleados de una compania que deben incluirse en el calculo de
+    /// la nomina semanal.
+    /// </summary>
+    /// <param name="companyId">Compania cuya nomina se calcula.</param>
     /// <param name="onlyActiveEmployees">Indica si se limita a empleados activos.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Empleados con su departamento cargado.</returns>
     Task<IReadOnlyCollection<Employee>> GetForPayrollAsync(
+        Guid companyId,
         bool onlyActiveEmployees,
         CancellationToken cancellationToken = default);
 
