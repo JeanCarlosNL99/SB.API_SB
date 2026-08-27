@@ -64,10 +64,11 @@ En el primer arranque, la aplicación:
 - genera `src/SB.API_SB.Presentation/Database/GovernmentEntities.txt` a partir del
   archivo semilla con las 181 entidades gubernamentales;
 - crea la base de datos relacional (SQLite por defecto) y siembra roles, el
-  usuario administrador, cinco departamentos, **tres compañías**, **once empleados**
-  que ejercitan los cuatro tipos de cálculo y **24 nóminas históricas** (ocho
-  semanas anteriores por compañía) para que el historial tenga datos desde el
-  primer momento.
+  usuario administrador, cinco departamentos, **once empleados** repartidos entre
+  **cuatro entidades gubernamentales** reales del listado oficial, que ejercitan
+  los cuatro tipos de cálculo, y **32 nóminas históricas** (ocho semanas
+  anteriores por entidad) para que el historial tenga datos desde el primer
+  momento.
 
 ### 2.2 Frontend (portal web)
 
