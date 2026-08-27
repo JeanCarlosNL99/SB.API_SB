@@ -21,6 +21,10 @@ Content-Type: application/json
 GET {{baseUrl}}/api/autenticacion/sesion-actual
 Authorization: Bearer {{token}}
 
+## ---------------------------------------------------------------------------
+## Entidades gubernamentales (catalogo de solo lectura, en archivo de texto plano)
+## ---------------------------------------------------------------------------
+
 ### Consultar entidades gubernamentales con filtros
 GET {{baseUrl}}/api/entidades-gubernamentales?name=Instituto&pageNumber=1&pageSize=10
 Authorization: Bearer {{token}}
@@ -29,23 +33,23 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/api/entidades-gubernamentales/catalogos
 Authorization: Bearer {{token}}
 
-### Crear entidad gubernamental
-POST {{baseUrl}}/api/entidades-gubernamentales
+### Listado completo para alimentar un selector (identificador y nombre)
+GET {{baseUrl}}/api/entidades-gubernamentales/opciones
 Authorization: Bearer {{token}}
-Content-Type: application/json
 
-{
-  "name": "Instituto Nacional de Ejemplo",
-  "category": "Organismo Descentralizado Funcionalmente",
-  "stateBranch": "Poder Ejecutivo",
-  "sector": "Hacienda"
-}
+### Obtener una entidad gubernamental por su identificador
+GET {{baseUrl}}/api/entidades-gubernamentales/REEMPLAZAR_POR_GUID_DE_ENTIDAD
+Authorization: Bearer {{token}}
+
+## ---------------------------------------------------------------------------
+## Empleados
+## ---------------------------------------------------------------------------
 
 ### Consultar departamentos
 GET {{baseUrl}}/api/departamentos
 Authorization: Bearer {{token}}
 
-### Consultar empleados con filtros por nombre, departamento y estado
+### Consultar empleados con filtros por nombre, entidad, departamento y estado
 GET {{baseUrl}}/api/empleados?name=Martinez&status=Active&pageNumber=1&pageSize=10
 Authorization: Bearer {{token}}
 
@@ -59,12 +63,14 @@ Content-Type: application/json
   "firstName": "Ana",
   "paternalLastName": "Martinez",
   "socialSecurityNumber": "001-1111111-1",
+  "governmentEntityId": "REEMPLAZAR_POR_GUID_DE_ENTIDAD",
   "departmentId": "REEMPLAZAR_POR_GUID_DE_DEPARTAMENTO",
   "status": "Active",
   "weeklySalary": 35000
 }
 
 ### Crear empleado por horas (con horas extras)
+# El pago se calcula como 300 x 40 + 300 x 1.5 x 5 = 14,250.00
 POST {{baseUrl}}/api/empleados
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -73,6 +79,7 @@ Content-Type: application/json
   "type": "Hourly",
   "paternalLastName": "Rodriguez",
   "socialSecurityNumber": "001-2222222-2",
+  "governmentEntityId": "REEMPLAZAR_POR_GUID_DE_ENTIDAD",
   "departmentId": "REEMPLAZAR_POR_GUID_DE_DEPARTAMENTO",
   "status": "Active",
   "hourlyWage": 300,
@@ -89,6 +96,7 @@ Content-Type: application/json
   "firstName": "Carmen",
   "paternalLastName": "Guzman",
   "socialSecurityNumber": "001-3333333-3",
+  "governmentEntityId": "REEMPLAZAR_POR_GUID_DE_ENTIDAD",
   "departmentId": "REEMPLAZAR_POR_GUID_DE_DEPARTAMENTO",
   "status": "Active",
   "grossSales": 180000,
@@ -96,38 +104,38 @@ Content-Type: application/json
   "baseSalary": 20000
 }
 
-### Reporte semanal de nomina
-GET {{baseUrl}}/api/reportes-nomina/semanal?soloEmpleadosActivos=true
-Authorization: Bearer {{token}}
-
-### Consultar usuarios (requiere rol Administrador)
-GET {{baseUrl}}/api/usuarios
-Authorization: Bearer {{token}}
-
-### Consultar roles disponibles
-GET {{baseUrl}}/api/usuarios/roles
-Authorization: Bearer {{token}}
-
-### Consultar companias
-GET {{baseUrl}}/api/companias
-Authorization: Bearer {{token}}
-
-### Crear compania
-POST {{baseUrl}}/api/companias
+### Crear empleado apuntando a una entidad que no existe
+# Devuelve HTTP 404. Es la comprobacion que sustituye a la clave foranea que no
+# puede existir entre la base de datos relacional y el archivo de texto plano.
+POST {{baseUrl}}/api/empleados
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "Compania de Ejemplo, S. A.",
-  "taxIdentificationNumber": "101-99999-9"
+  "type": "Hourly",
+  "paternalLastName": "Prueba",
+  "socialSecurityNumber": "001-4444444-4",
+  "governmentEntityId": "99999999-9999-9999-9999-999999999999",
+  "departmentId": "REEMPLAZAR_POR_GUID_DE_DEPARTAMENTO",
+  "status": "Active",
+  "hourlyWage": 300,
+  "hoursWorked": 45
 }
 
-### Vista previa del calculo de una semana (no persiste nada)
-GET {{baseUrl}}/api/nomina/vista-previa?companyId=REEMPLAZAR_POR_GUID&year=2026&weekNumber=34&onlyActiveEmployees=true
+## ---------------------------------------------------------------------------
+## Calculo de pagos semanales
+## ---------------------------------------------------------------------------
+
+### Entidades gubernamentales que tienen empleados y por tanto nomina que calcular
+GET {{baseUrl}}/api/nomina/entidades
 Authorization: Bearer {{token}}
 
-### Semanas ya pagadas por la compania en el ano
-GET {{baseUrl}}/api/nomina/semanas-generadas?companyId=REEMPLAZAR_POR_GUID&year=2026
+### Vista previa del calculo de una semana (no persiste nada)
+GET {{baseUrl}}/api/nomina/vista-previa?governmentEntityId=REEMPLAZAR_POR_GUID_DE_ENTIDAD&year=2026&weekNumber=35&onlyActiveEmployees=true
+Authorization: Bearer {{token}}
+
+### Semanas ya pagadas por la entidad gubernamental en el ano
+GET {{baseUrl}}/api/nomina/semanas-generadas?governmentEntityId=REEMPLAZAR_POR_GUID_DE_ENTIDAD&year=2026
 Authorization: Bearer {{token}}
 
 ### Generar el pago de la semana
@@ -137,9 +145,9 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "companyId": "REEMPLAZAR_POR_GUID",
+  "governmentEntityId": "REEMPLAZAR_POR_GUID_DE_ENTIDAD",
   "year": 2026,
-  "weekNumber": 34,
+  "weekNumber": 35,
   "onlyActiveEmployees": true
 }
 
@@ -159,6 +167,18 @@ Content-Type: application/json
 {
   "reason": "Se cargaron horas incorrectas en el periodo."
 }
+
+## ---------------------------------------------------------------------------
+## Seguridad y diagnostico
+## ---------------------------------------------------------------------------
+
+### Consultar usuarios (requiere rol Administrador)
+GET {{baseUrl}}/api/usuarios
+Authorization: Bearer {{token}}
+
+### Consultar roles disponibles
+GET {{baseUrl}}/api/usuarios/roles
+Authorization: Bearer {{token}}
 
 ### Archivos del registro de eventos (requiere rol Administrador)
 GET {{baseUrl}}/api/registro-eventos/archivos

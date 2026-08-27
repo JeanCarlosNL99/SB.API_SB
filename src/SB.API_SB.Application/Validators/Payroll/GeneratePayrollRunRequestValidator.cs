@@ -17,8 +17,8 @@ public sealed class GeneratePayrollRunRequestValidator
 {
     public GeneratePayrollRunRequestValidator()
     {
-        RuleFor(request => request.CompanyId)
-            .NotEqual(Guid.Empty).WithMessage("La compania es obligatoria.");
+        RuleFor(request => request.GovernmentEntityId)
+            .NotEqual(Guid.Empty).WithMessage("La entidad gubernamental es obligatoria.");
 
         RuleFor(request => request.Year)
             .InclusiveBetween(PayrollWeek.MINIMUM_YEAR, PayrollWeek.MAXIMUM_YEAR)

@@ -6,6 +6,7 @@ using SB.API_SB.Application.Interfaces.Services;
 using SB.API_SB.Application.Mappings;
 using SB.API_SB.Domain.Common;
 using SB.API_SB.Domain.Entities;
+using SB.API_SB.Domain.Enums;
 using SB.API_SB.Domain.Exceptions;
 using SB.API_SB.Domain.Interfaces.Criteria;
 using SB.API_SB.Domain.Interfaces.Repositories;
@@ -25,10 +26,12 @@ public sealed class EmployeeService : IEmployeeService
 {
     private const string EMPLOYEE_ENTITY_NAME = "el empleado";
     private const string SOCIAL_SECURITY_NUMBER_FIELD_NAME = "numero de seguro social";
+    private const string GOVERNMENT_ENTITY_NAME = "la entidad gubernamental";
+    private const string UNKNOWN_GOVERNMENT_ENTITY_NAME = "Entidad no disponible";
 
     private readonly IEmployeeRepository employeeRepository;
     private readonly IDepartmentRepository departmentRepository;
-    private readonly ICompanyRepository companyRepository;
+    private readonly IGovernmentEntityRepository governmentEntityRepository;
     private readonly IEmployeeTypeHandlerResolver typeHandlerResolver;
     private readonly IUnitOfWork unitOfWork;
     private readonly ILogger<EmployeeService> logger;
@@ -36,14 +39,14 @@ public sealed class EmployeeService : IEmployeeService
     public EmployeeService(
         IEmployeeRepository employeeRepository,
         IDepartmentRepository departmentRepository,
-        ICompanyRepository companyRepository,
+        IGovernmentEntityRepository governmentEntityRepository,
         IEmployeeTypeHandlerResolver typeHandlerResolver,
         IUnitOfWork unitOfWork,
         ILogger<EmployeeService> logger)
     {
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
-        this.companyRepository = companyRepository;
+        this.governmentEntityRepository = governmentEntityRepository;
         this.typeHandlerResolver = typeHandlerResolver;
         this.unitOfWork = unitOfWork;
         this.logger = logger;
@@ -59,7 +62,7 @@ public sealed class EmployeeService : IEmployeeService
         EmployeeFilterCriteria criteria = new()
         {
             Name = filter.Name,
-            CompanyId = filter.CompanyId,
+            GovernmentEntityId = filter.GovernmentEntityId,
             DepartmentId = filter.DepartmentId,
             Status = filter.Status,
             Type = filter.Type,
@@ -70,6 +73,12 @@ public sealed class EmployeeService : IEmployeeService
         PagedList<Employee> employees = await employeeRepository.SearchAsync(
             criteria,
             cancellationToken);
+
+        // El nombre de la entidad gubernamental no se puede unir en la consulta:
+        // vive en el archivo de texto plano. Se lee el catalogo una sola vez para
+        // toda la pagina, en lugar de una consulta por empleado.
+        IReadOnlyDictionary<Guid, string> governmentEntityNames =
+            await governmentEntityRepository.GetNamesByIdentifierAsync(cancellationToken);
 
         logger.LogInformation(
             "Consulta de empleados. Nombre: {Name}. Departamento: {DepartmentId}. " +
@@ -83,7 +92,10 @@ public sealed class EmployeeService : IEmployeeService
         // necesita el monto y el detalle se consulta al abrir un empleado.
         return PagedResponse<EmployeeResponse>.FromPagedList(
             employees,
-            employee => MapToResponse(employee, includePaymentBreakdown: false));
+            employee => MapToResponse(
+                employee,
+                ResolveGovernmentEntityName(governmentEntityNames, employee.GovernmentEntityId),
+                includePaymentBreakdown: false));
     }
 
     /// <inheritdoc />
@@ -93,7 +105,14 @@ public sealed class EmployeeService : IEmployeeService
     {
         Employee employee = await GetRequiredEmployeeAsync(employeeId, cancellationToken);
 
-        return MapToResponse(employee, includePaymentBreakdown: true);
+        GovernmentEntity? governmentEntity = await governmentEntityRepository.GetByIdAsync(
+            employee.GovernmentEntityId,
+            cancellationToken);
+
+        return MapToResponse(
+            employee,
+            governmentEntity?.Name ?? UNKNOWN_GOVERNMENT_ENTITY_NAME,
+            includePaymentBreakdown: true);
     }
 
     /// <inheritdoc />
@@ -103,7 +122,9 @@ public sealed class EmployeeService : IEmployeeService
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
+        await EnsureGovernmentEntityIsAssignableAsync(
+            request.GovernmentEntityId,
+            cancellationToken);
         await EnsureDepartmentExistsAsync(request.DepartmentId, cancellationToken);
         await EnsureSocialSecurityNumberIsAvailableAsync(
             request.SocialSecurityNumber,
@@ -144,7 +165,9 @@ public sealed class EmployeeService : IEmployeeService
                 "No se puede cambiar el tipo de contrato de un empleado ya registrado.");
         }
 
-        await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
+        await EnsureGovernmentEntityIsAssignableAsync(
+            request.GovernmentEntityId,
+            cancellationToken);
         await EnsureDepartmentExistsAsync(request.DepartmentId, cancellationToken);
         await EnsureSocialSecurityNumberIsAvailableAsync(
             request.SocialSecurityNumber,
@@ -185,22 +208,38 @@ public sealed class EmployeeService : IEmployeeService
         await employeeRepository.GetWithDepartmentAsync(employeeId, cancellationToken)
             ?? throw new EntityNotFoundException(EMPLOYEE_ENTITY_NAME, employeeId);
 
-    private async Task EnsureCompanyExistsAsync(
-        Guid companyId,
+    /// <summary>
+    /// Comprueba que la entidad gubernamental exista en el catalogo y admita
+    /// empleados.
+    /// </summary>
+    /// <remarks>
+    /// Esta comprobacion es la que sustituye a la clave foranea. La entidad vive
+    /// en el archivo de texto plano y el empleado en la base de datos relacional,
+    /// de modo que ningun motor puede rechazar por si solo una referencia
+    /// invalida: la unica defensa es validarla aqui, antes de aceptar el registro.
+    /// </remarks>
+    /// <param name="governmentEntityId">Entidad a la que se quiere asignar.</param>
+    /// <param name="cancellationToken">Token de cancelacion.</param>
+    /// <returns>La entidad gubernamental validada.</returns>
+    private async Task<GovernmentEntity> EnsureGovernmentEntityIsAssignableAsync(
+        Guid governmentEntityId,
         CancellationToken cancellationToken)
     {
-        Company? company = await companyRepository.GetByIdAsync(companyId, cancellationToken);
+        GovernmentEntity governmentEntity = await governmentEntityRepository.GetByIdAsync(
+            governmentEntityId,
+            cancellationToken)
+            ?? throw new EntityNotFoundException(
+                GOVERNMENT_ENTITY_NAME,
+                governmentEntityId);
 
-        if (company is null)
-        {
-            throw new EntityNotFoundException("la compania", companyId);
-        }
-
-        if (!company.IsActive)
+        if (governmentEntity.Status != RecordStatus.Active)
         {
             throw new BusinessRuleViolationException(
-                $"La compania '{company.Name}' esta inactiva y no admite nuevos empleados.");
+                $"La entidad gubernamental '{governmentEntity.Name}' esta inactiva y no " +
+                "admite empleados.");
         }
+
+        return governmentEntity;
     }
 
     private async Task EnsureDepartmentExistsAsync(
@@ -244,10 +283,20 @@ public sealed class EmployeeService : IEmployeeService
         }
     }
 
-    private EmployeeResponse MapToResponse(Employee employee, bool includePaymentBreakdown)
+    private static string ResolveGovernmentEntityName(
+        IReadOnlyDictionary<Guid, string> governmentEntityNames,
+        Guid governmentEntityId) =>
+        governmentEntityNames.TryGetValue(governmentEntityId, out string? name)
+            ? name
+            : UNKNOWN_GOVERNMENT_ENTITY_NAME;
+
+    private EmployeeResponse MapToResponse(
+        Employee employee,
+        string governmentEntityName,
+        bool includePaymentBreakdown)
     {
         IEmployeeTypeHandler typeHandler = typeHandlerResolver.Resolve(employee.Type);
 
-        return employee.ToResponse(typeHandler, includePaymentBreakdown);
+        return employee.ToResponse(typeHandler, governmentEntityName, includePaymentBreakdown);
     }
 }

@@ -4,13 +4,10 @@ import {
   EmptyState,
   ErrorMessage,
   LoadingIndicator,
-  SuccessMessage,
 } from '@/components/Feedback';
-import { GovernmentEntityForm } from '@/components/GovernmentEntityForm';
-import { EditIcon, TrashIcon } from '@/components/Icons';
-import { ConfirmationDialog, Modal } from '@/components/Modal';
+import { DetailIcon } from '@/components/Icons';
+import { Modal } from '@/components/Modal';
 import { Pagination } from '@/components/Pagination';
-import { useAuthentication } from '@/hooks/useAuthentication';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { formatDate } from '@/utils/formatters';
@@ -20,7 +17,6 @@ import type {
   GovernmentEntityFilter,
   PagedResponse,
   RecordStatus,
-  UpdateGovernmentEntityRequest,
 } from '@/types/api';
 
 const INITIAL_FILTER: GovernmentEntityFilter = {
@@ -34,7 +30,11 @@ const INITIAL_FILTER: GovernmentEntityFilter = {
 };
 
 /**
- * Consulta del mantenimiento de entidades gubernamentales.
+ * Consulta del listado oficial de entidades gubernamentales.
+ *
+ * El listado es un catalogo de solo lectura: se distribuye con la aplicacion en
+ * el archivo de texto plano y es la fuente a la que se asocia cada empleado. La
+ * pantalla consulta y muestra el detalle; no lo administra.
  *
  * Los filtros se aplican de forma automatica: los desplegables al seleccionar y
  * el campo de texto mientras se escribe. Para que escribir no genere una
@@ -42,14 +42,10 @@ const INITIAL_FILTER: GovernmentEntityFilter = {
  * corto de inactividad.
  */
 export function GovernmentEntitiesPage() {
-  const { canWriteMaintenance } = useAuthentication();
-
   const [filter, setFilter] = useState<GovernmentEntityFilter>(INITIAL_FILTER);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [entityBeingEdited, setEntityBeingEdited] = useState<GovernmentEntity | null>(null);
-  const [entityBeingDeleted, setEntityBeingDeleted] = useState<GovernmentEntity | null>(null);
-  const [operationError, setOperationError] = useState<unknown>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [entityBeingViewed, setEntityBeingViewed] = useState<GovernmentEntity | null>(
+    null,
+  );
 
   const catalogsQuery = useAsyncData(() => governmentEntitiesApi.getCatalogs(), []);
 
@@ -94,64 +90,6 @@ export function GovernmentEntitiesPage() {
   // tabla en lugar de sustituirla, para no parpadear en cada pulsacion.
   const isRefreshing = entitiesQuery.isLoading && entitiesQuery.data !== null;
   const isFirstLoad = entitiesQuery.isLoading && entitiesQuery.data === null;
-
-  /**
-   * Abre el formulario de edicion. Se extrae a una funcion porque la accion se
-   * dispara desde dos lugares: el boton de la fila y el clic sobre la fila.
-   */
-  function openEditor(entity: GovernmentEntity) {
-    setOperationError(null);
-    setSuccessMessage(null);
-    setEntityBeingEdited(entity);
-  }
-
-  function openDeleteConfirmation(entity: GovernmentEntity) {
-    setOperationError(null);
-    setSuccessMessage(null);
-    setEntityBeingDeleted(entity);
-  }
-
-  async function handleUpdate(values: UpdateGovernmentEntityRequest) {
-    if (!entityBeingEdited) {
-      return;
-    }
-
-    setIsProcessing(true);
-    setOperationError(null);
-
-    try {
-      await governmentEntitiesApi.update(entityBeingEdited.id, values);
-      setEntityBeingEdited(null);
-      setSuccessMessage(`La entidad "${values.name}" se actualizo correctamente.`);
-      await entitiesQuery.reload();
-      await catalogsQuery.reload();
-    } catch (error) {
-      setOperationError(error);
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!entityBeingDeleted) {
-      return;
-    }
-
-    setIsProcessing(true);
-    setOperationError(null);
-
-    try {
-      await governmentEntitiesApi.remove(entityBeingDeleted.id);
-      setSuccessMessage(`La entidad "${entityBeingDeleted.name}" se elimino correctamente.`);
-      setEntityBeingDeleted(null);
-      await entitiesQuery.reload();
-    } catch (error) {
-      setOperationError(error);
-      setEntityBeingDeleted(null);
-    } finally {
-      setIsProcessing(false);
-    }
-  }
 
   return (
     <>
@@ -258,8 +196,7 @@ export function GovernmentEntitiesPage() {
           </div>
         </div>
 
-        <SuccessMessage message={successMessage} />
-        <ErrorMessage error={operationError ?? entitiesQuery.error} />
+        <ErrorMessage error={entitiesQuery.error} />
 
         {isFirstLoad && <LoadingIndicator />}
 
@@ -281,19 +218,17 @@ export function GovernmentEntitiesPage() {
                       <th>Sector</th>
                       <th>Estado</th>
                       <th>Registrado</th>
-                      {canWriteMaintenance && <th aria-label="Acciones" />}
+                      <th aria-label="Acciones" />
                     </tr>
                   </thead>
                   <tbody>
                     {entitiesQuery.data.items.map((entity) => (
                       <tr
                         key={entity.id}
-                        {...(canWriteMaintenance
-                          ? buildClickableRowProps(
-                              () => openEditor(entity),
-                              `Editar ${entity.name}`,
-                            )
-                          : {})}
+                        {...buildClickableRowProps(
+                          () => setEntityBeingViewed(entity),
+                          `Ver el detalle de ${entity.name}`,
+                        )}
                       >
                         <td className="table td--wrap">{entity.name}</td>
                         <td>{entity.category}</td>
@@ -311,30 +246,19 @@ export function GovernmentEntitiesPage() {
                           </span>
                         </td>
                         <td>{formatDate(entity.createdAt)}</td>
-                        {canWriteMaintenance && (
-                          <td>
-                            <div className="table__actions">
-                              <button
-                                type="button"
-                                className="button button--icon"
-                                title="Editar"
-                                aria-label={`Editar ${entity.name}`}
-                                onClick={() => openEditor(entity)}
-                              >
-                                <EditIcon />
-                              </button>
-                              <button
-                                type="button"
-                                className="button button--icon"
-                                title="Eliminar"
-                                aria-label={`Eliminar ${entity.name}`}
-                                onClick={() => openDeleteConfirmation(entity)}
-                              >
-                                <TrashIcon />
-                              </button>
-                            </div>
-                          </td>
-                        )}
+                        <td>
+                          <div className="table__actions">
+                            <button
+                              type="button"
+                              className="button button--icon"
+                              title="Ver detalle"
+                              aria-label={`Ver el detalle de ${entity.name}`}
+                              onClick={() => setEntityBeingViewed(entity)}
+                            >
+                              <DetailIcon />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -354,34 +278,33 @@ export function GovernmentEntitiesPage() {
       </section>
 
       <Modal
-        title="Editar entidad gubernamental"
-        description="Los cambios se guardan en la base de datos de texto plano del proyecto."
-        isOpen={entityBeingEdited !== null}
-        onClose={() => setEntityBeingEdited(null)}
+        title="Detalle de la entidad gubernamental"
+        description="Registro del listado oficial, almacenado en la base de datos de texto plano del proyecto."
+        isOpen={entityBeingViewed !== null}
+        onClose={() => setEntityBeingViewed(null)}
       >
-        {entityBeingEdited && (
-          <GovernmentEntityForm
-            entity={entityBeingEdited}
-            catalogs={
-              catalogsQuery.data ?? { categories: [], sectors: [], stateBranches: [] }
-            }
-            isSubmitting={isProcessing}
-            submitError={operationError}
-            onSubmit={handleUpdate}
-            onCancel={() => setEntityBeingEdited(null)}
-          />
+        {entityBeingViewed && (
+          <div>
+            <DetailRow label="Nombre" value={entityBeingViewed.name} />
+            <DetailRow label="Categoria" value={entityBeingViewed.category} />
+            <DetailRow label="Poder del Estado" value={entityBeingViewed.stateBranch} />
+            <DetailRow label="Sector" value={entityBeingViewed.sector} />
+            <DetailRow label="Estado" value={entityBeingViewed.statusDescription} />
+            <DetailRow label="Registrado" value={formatDate(entityBeingViewed.createdAt)} />
+          </div>
         )}
       </Modal>
-
-      <ConfirmationDialog
-        isOpen={entityBeingDeleted !== null}
-        title="Eliminar entidad gubernamental"
-        message={`Se eliminara "${entityBeingDeleted?.name ?? ''}" del mantenimiento. Esta accion no se puede deshacer.`}
-        isProcessing={isProcessing}
-        onConfirm={handleDelete}
-        onCancel={() => setEntityBeingDeleted(null)}
-      />
     </>
+  );
+}
+
+/** Fila de un par etiqueta/valor dentro del detalle. */
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="detail-row">
+      <span className="detail-row__label">{label}</span>
+      <span className="detail-row__value">{value}</span>
+    </div>
   );
 }
 

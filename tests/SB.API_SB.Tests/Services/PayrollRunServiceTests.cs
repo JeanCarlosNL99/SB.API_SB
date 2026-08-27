@@ -20,7 +20,7 @@ namespace SB.API_SB.Tests.Services;
 /// </summary>
 /// <remarks>
 /// La regla que se verifica con mas insistencia es que una semana no se pueda
-/// pagar dos veces: es la que protege a la compania de un pago duplicado, y la
+/// pagar dos veces: es la que protege a la entidad gubernamental de un pago duplicado, y la
 /// que el enunciado exige explicitamente.
 /// </remarks>
 public sealed class PayrollRunServiceTests
@@ -28,13 +28,14 @@ public sealed class PayrollRunServiceTests
     private const int PERFORMANCE_EMPLOYEE_COUNT = 1_000;
     private const int PERFORMANCE_LIMIT_IN_MILLISECONDS = 2_000;
 
-    private static readonly Guid COMPANY_ID = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid GOVERNMENT_ENTITY_ID = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly DateTime FIXED_NOW = new(2026, 8, 26, 12, 0, 0, DateTimeKind.Utc);
 
     private readonly IPayrollRunRepository payrollRunRepository =
         Substitute.For<IPayrollRunRepository>();
 
-    private readonly ICompanyRepository companyRepository = Substitute.For<ICompanyRepository>();
+    private readonly IGovernmentEntityRepository governmentEntityRepository =
+        Substitute.For<IGovernmentEntityRepository>();
     private readonly IEmployeeRepository employeeRepository = Substitute.For<IEmployeeRepository>();
     private readonly IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly PayrollRunService payrollRunService;
@@ -44,23 +45,25 @@ public sealed class PayrollRunServiceTests
 
     public PayrollRunServiceTests()
     {
-        companyRepository
-            .GetByIdAsync(COMPANY_ID, Arg.Any<CancellationToken>())
-            .Returns(new Company
+        governmentEntityRepository
+            .GetByIdAsync(GOVERNMENT_ENTITY_ID, Arg.Any<CancellationToken>())
+            .Returns(new GovernmentEntity
             {
-                Id = COMPANY_ID,
-                Name = "Servicios Financieros del Caribe, S. A.",
-                TaxIdentificationNumber = "101-00001-1",
-                IsActive = true
+                Id = GOVERNMENT_ENTITY_ID,
+                Name = "Direccion General de Impuestos Internos",
+                Category = "Organismo Descentralizado Funcionalmente",
+                StateBranch = "Poder Ejecutivo",
+                Sector = "Hacienda",
+                Status = RecordStatus.Active
             });
 
         employeeRepository
-            .GetForPayrollAsync(COMPANY_ID, Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .GetForPayrollAsync(GOVERNMENT_ENTITY_ID, Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(BuildSampleEmployees());
 
         payrollRunService = new PayrollRunService(
             payrollRunRepository,
-            companyRepository,
+            governmentEntityRepository,
             employeeRepository,
             new PayrollCalculator(EmployeeTypeHandlerResolverFactory.Create()),
             new FixedDateTimeProvider(FIXED_NOW),
@@ -77,7 +80,7 @@ public sealed class PayrollRunServiceTests
             BuildRequest());
 
         Assert.NotNull(generatedRun.Value);
-        Assert.Equal(COMPANY_ID, generatedRun.Value!.CompanyId);
+        Assert.Equal(GOVERNMENT_ENTITY_ID, generatedRun.Value!.GovernmentEntityId);
         Assert.Equal(pastWeek.Year, generatedRun.Value!.Year);
         Assert.Equal(pastWeek.WeekNumber, generatedRun.Value!.WeekNumber);
         Assert.Equal(pastWeek.StartDate, generatedRun.Value!.WeekStartDate);
@@ -99,11 +102,11 @@ public sealed class PayrollRunServiceTests
         Guid existingRunId = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
         payrollRunRepository
-            .FindGeneratedRunAsync(COMPANY_ID, Arg.Any<PayrollWeek>(), Arg.Any<CancellationToken>())
+            .FindGeneratedRunAsync(GOVERNMENT_ENTITY_ID, Arg.Any<PayrollWeek>(), Arg.Any<CancellationToken>())
             .Returns(new PayrollRun
             {
                 Id = existingRunId,
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                 Year = pastWeek.Year,
                 WeekNumber = pastWeek.WeekNumber,
                 Status = PayrollRunStatus.Generated
@@ -132,7 +135,7 @@ public sealed class PayrollRunServiceTests
 
         GeneratePayrollRunRequest request = new()
         {
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
             Year = futureWeek.Year,
             WeekNumber = futureWeek.WeekNumber
         };
@@ -145,10 +148,10 @@ public sealed class PayrollRunServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_CompaniaSinEmpleados_LanzaExcepcionDeReglaDeNegocio()
+    public async Task GenerateAsync_EntidadGubernamentalSinEmpleados_LanzaExcepcionDeReglaDeNegocio()
     {
         employeeRepository
-            .GetForPayrollAsync(COMPANY_ID, Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .GetForPayrollAsync(GOVERNMENT_ENTITY_ID, Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Employee>());
 
         BusinessRuleViolationException exception =
@@ -159,11 +162,16 @@ public sealed class PayrollRunServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_CompaniaInactiva_LanzaExcepcionDeReglaDeNegocio()
+    public async Task GenerateAsync_EntidadGubernamentalInactiva_LanzaExcepcionDeReglaDeNegocio()
     {
-        companyRepository
-            .GetByIdAsync(COMPANY_ID, Arg.Any<CancellationToken>())
-            .Returns(new Company { Id = COMPANY_ID, Name = "Compania Cerrada", IsActive = false });
+        governmentEntityRepository
+            .GetByIdAsync(GOVERNMENT_ENTITY_ID, Arg.Any<CancellationToken>())
+            .Returns(new GovernmentEntity
+            {
+                Id = GOVERNMENT_ENTITY_ID,
+                Name = "Entidad Suprimida",
+                Status = RecordStatus.Inactive
+            });
 
         BusinessRuleViolationException exception =
             await Assert.ThrowsAsync<BusinessRuleViolationException>(
@@ -173,16 +181,16 @@ public sealed class PayrollRunServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_CompaniaInexistente_LanzaExcepcionDeNoEncontrado()
+    public async Task GenerateAsync_EntidadGubernamentalInexistente_LanzaExcepcionDeNoEncontrado()
     {
-        Guid unknownCompanyId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        Guid unknownGovernmentEntityId = Guid.Parse("99999999-9999-9999-9999-999999999999");
 
-        companyRepository
-            .GetByIdAsync(unknownCompanyId, Arg.Any<CancellationToken>())
-            .Returns((Company?)null);
+        governmentEntityRepository
+            .GetByIdAsync(unknownGovernmentEntityId, Arg.Any<CancellationToken>())
+            .Returns((GovernmentEntity?)null);
 
         GeneratePayrollRunRequest request = BuildRequest();
-        request.CompanyId = unknownCompanyId;
+        request.GovernmentEntityId = unknownGovernmentEntityId;
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
             () => payrollRunService.GenerateAsync(request));
@@ -214,11 +222,11 @@ public sealed class PayrollRunServiceTests
         Guid existingRunId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
         payrollRunRepository
-            .FindGeneratedRunAsync(COMPANY_ID, Arg.Any<PayrollWeek>(), Arg.Any<CancellationToken>())
-            .Returns(new PayrollRun { Id = existingRunId, CompanyId = COMPANY_ID });
+            .FindGeneratedRunAsync(GOVERNMENT_ENTITY_ID, Arg.Any<PayrollWeek>(), Arg.Any<CancellationToken>())
+            .Returns(new PayrollRun { Id = existingRunId, GovernmentEntityId = GOVERNMENT_ENTITY_ID });
 
         PayrollPreviewResponse preview = await payrollRunService.PreviewAsync(
-            COMPANY_ID,
+            GOVERNMENT_ENTITY_ID,
             pastWeek.Year,
             pastWeek.WeekNumber,
             onlyActiveEmployees: true);
@@ -233,7 +241,7 @@ public sealed class PayrollRunServiceTests
     public async Task PreviewAsync_NoPersisteNada()
     {
         await payrollRunService.PreviewAsync(
-            COMPANY_ID,
+            GOVERNMENT_ENTITY_ID,
             pastWeek.Year,
             pastWeek.WeekNumber,
             onlyActiveEmployees: true);
@@ -251,7 +259,7 @@ public sealed class PayrollRunServiceTests
         CapturedPayrollRun generatedRun = CaptureGeneratedRun();
 
         PayrollPreviewResponse preview = await payrollRunService.PreviewAsync(
-            COMPANY_ID,
+            GOVERNMENT_ENTITY_ID,
             pastWeek.Year,
             pastWeek.WeekNumber,
             onlyActiveEmployees: true);
@@ -276,7 +284,7 @@ public sealed class PayrollRunServiceTests
         PayrollRun existingRun = new()
         {
             Id = payrollRunId,
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
             Year = pastWeek.Year,
             WeekNumber = pastWeek.WeekNumber,
             Status = PayrollRunStatus.Generated
@@ -307,7 +315,7 @@ public sealed class PayrollRunServiceTests
             .Returns(new PayrollRun
             {
                 Id = payrollRunId,
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                 Status = PayrollRunStatus.Cancelled
             });
 
@@ -326,7 +334,7 @@ public sealed class PayrollRunServiceTests
 
         PayrollRunFilterRequest filter = new()
         {
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
             Year = 2026,
             IncludeCancelled = false,
             PageNumber = 3,
@@ -337,7 +345,7 @@ public sealed class PayrollRunServiceTests
 
         await payrollRunRepository.Received(1).SearchAsync(
             Arg.Is<PayrollRunFilterCriteria>(criteria =>
-                criteria.CompanyId == COMPANY_ID &&
+                criteria.GovernmentEntityId == GOVERNMENT_ENTITY_ID &&
                 criteria.Year == 2026 &&
                 !criteria.IncludeCancelled &&
                 criteria.PageNumber == 3 &&
@@ -353,7 +361,7 @@ public sealed class PayrollRunServiceTests
     public async Task GenerateAsync_ConMilEmpleados_TerminaEnMenosDeDosSegundos()
     {
         employeeRepository
-            .GetForPayrollAsync(COMPANY_ID, Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .GetForPayrollAsync(GOVERNMENT_ENTITY_ID, Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(BuildManyEmployees(PERFORMANCE_EMPLOYEE_COUNT));
 
         CapturedPayrollRun generatedRun = CaptureGeneratedRun();
@@ -374,7 +382,7 @@ public sealed class PayrollRunServiceTests
 
     private GeneratePayrollRunRequest BuildRequest() => new()
     {
-        CompanyId = COMPANY_ID,
+        GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         Year = pastWeek.Year,
         WeekNumber = pastWeek.WeekNumber,
         OnlyActiveEmployees = true
@@ -426,7 +434,7 @@ public sealed class PayrollRunServiceTests
                 FirstName = "Ana",
                 PaternalLastName = "Martinez",
                 SocialSecurityNumber = "001-0000001-1",
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                 Department = technologyDepartment,
                 Status = EmployeeStatus.Active,
                 WeeklySalary = 35_000m
@@ -435,7 +443,7 @@ public sealed class PayrollRunServiceTests
             {
                 PaternalLastName = "Rodriguez",
                 SocialSecurityNumber = "001-0000002-2",
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                 Department = technologyDepartment,
                 Status = EmployeeStatus.Active,
                 HourlyWage = 450m,
@@ -446,7 +454,7 @@ public sealed class PayrollRunServiceTests
                 FirstName = "Luis",
                 PaternalLastName = "Perez",
                 SocialSecurityNumber = "001-0000003-3",
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                 Department = financeDepartment,
                 Status = EmployeeStatus.Active,
                 GrossSales = 250_000m,
@@ -457,7 +465,7 @@ public sealed class PayrollRunServiceTests
                 FirstName = "Carmen",
                 PaternalLastName = "Guzman",
                 SocialSecurityNumber = "001-0000004-4",
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                 Department = financeDepartment,
                 Status = EmployeeStatus.Active,
                 GrossSales = 180_000m,
@@ -481,7 +489,7 @@ public sealed class PayrollRunServiceTests
                     FirstName = $"Nombre{index}",
                     PaternalLastName = $"Apellido{index}",
                     SocialSecurityNumber = $"001-{index:D7}-1",
-                    CompanyId = COMPANY_ID,
+                    GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                     Department = department,
                     WeeklySalary = 20_000m + index
                 },
@@ -489,7 +497,7 @@ public sealed class PayrollRunServiceTests
                 {
                     PaternalLastName = $"Apellido{index}",
                     SocialSecurityNumber = $"001-{index:D7}-2",
-                    CompanyId = COMPANY_ID,
+                    GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                     Department = department,
                     HourlyWage = 200m,
                     HoursWorked = 38m + (index % 10)
@@ -499,7 +507,7 @@ public sealed class PayrollRunServiceTests
                     FirstName = $"Nombre{index}",
                     PaternalLastName = $"Apellido{index}",
                     SocialSecurityNumber = $"001-{index:D7}-3",
-                    CompanyId = COMPANY_ID,
+                    GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                     Department = department,
                     GrossSales = 100_000m + index,
                     CommissionRate = 0.05m
@@ -509,7 +517,7 @@ public sealed class PayrollRunServiceTests
                     FirstName = $"Nombre{index}",
                     PaternalLastName = $"Apellido{index}",
                     SocialSecurityNumber = $"001-{index:D7}-4",
-                    CompanyId = COMPANY_ID,
+                    GovernmentEntityId = GOVERNMENT_ENTITY_ID,
                     Department = department,
                     GrossSales = 90_000m + index,
                     CommissionRate = 0.04m,

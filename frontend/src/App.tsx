@@ -2,8 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { LoadingIndicator } from '@/components/Feedback';
 import { useAuthentication } from '@/hooks/useAuthentication';
-import { CompaniesPage } from '@/pages/CompaniesPage';
-import { CreateGovernmentEntityPage } from '@/pages/CreateGovernmentEntityPage';
 import { EmployeesPage } from '@/pages/EmployeesPage';
 import { EventLogPage } from '@/pages/EventLogPage';
 import { GovernmentEntitiesPage } from '@/pages/GovernmentEntitiesPage';
@@ -36,16 +34,7 @@ export function App() {
         <Route path="/inicio" element={<HomePage />} />
 
         <Route path="/entidades" element={<GovernmentEntitiesPage />} />
-        <Route
-          path="/entidades/nuevo"
-          element={
-            <RequireWritePermission>
-              <CreateGovernmentEntityPage />
-            </RequireWritePermission>
-          }
-        />
 
-        <Route path="/companias" element={<CompaniesPage />} />
         <Route path="/empleados" element={<EmployeesPage />} />
         <Route path="/nomina" element={<PayrollPage />} />
         <Route path="/nomina/historial" element={<PayrollHistoryPage />} />
@@ -83,16 +72,6 @@ function RequireAuthentication({ children }: { children: ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/iniciar-sesion" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function RequireWritePermission({ children }: { children: ReactNode }) {
-  const { canWriteMaintenance } = useAuthentication();
-
-  if (!canWriteMaintenance) {
-    return <Navigate to="/entidades" replace />;
   }
 
   return <>{children}</>;

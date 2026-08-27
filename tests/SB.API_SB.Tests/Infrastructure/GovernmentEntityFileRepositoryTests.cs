@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using SB.API_SB.Domain.Common;
 using SB.API_SB.Domain.Entities;
-using SB.API_SB.Domain.Enums;
 using SB.API_SB.Domain.Interfaces.Criteria;
 using SB.API_SB.Domain.Interfaces.Repositories;
 using SB.API_SB.Infrastructure.FlatFileStorage;
@@ -12,20 +11,27 @@ using Xunit;
 namespace SB.API_SB.Tests.Infrastructure;
 
 /// <summary>
-/// Pruebas del repositorio respaldado por archivo de texto plano.
+/// Pruebas del repositorio de consulta respaldado por archivo de texto plano.
 /// </summary>
 /// <remarks>
-/// Se ejecutan contra un directorio temporal real: el objetivo es verificar que
-/// los datos sobreviven al viaje completo por el sistema de archivos, no simular
-/// el sistema de archivos. Cada prueba usa su propio directorio y lo elimina al
-/// terminar, por lo que son reproducibles y aisladas entre si.
+/// Se ejercita el recorrido completo del dato: se escribe un archivo semilla, el
+/// inicializador genera el archivo de datos y el repositorio lo lee. Verificar
+/// ese camino y no una escritura sintetica es lo que da valor a la prueba, porque
+/// es exactamente lo que ocurre al arrancar la aplicacion.
+/// <para>
+/// Cada prueba usa su propio directorio temporal real y lo elimina al terminar,
+/// por lo que son reproducibles y aisladas entre si.
+/// </para>
 /// </remarks>
 public sealed class GovernmentEntityFileRepositoryTests : IDisposable
 {
-    private const string CREATION_USER_NAME = "pruebas";
+    private const string DATA_FILE_NAME = "GovernmentEntities.txt";
+    private const string SEED_FILE_NAME = "GovernmentEntities.seed.txt";
+    private const string STATE_BRANCH = "Poder Ejecutivo";
 
     private readonly string temporaryDirectoryPath;
-    private readonly GovernmentEntityFileRepository repository;
+    private readonly FlatFileDatabaseOptions options;
+    private readonly TemporaryDirectoryPathResolver pathResolver;
 
     public GovernmentEntityFileRepositoryTests()
     {
@@ -36,100 +42,97 @@ public sealed class GovernmentEntityFileRepositoryTests : IDisposable
 
         Directory.CreateDirectory(temporaryDirectoryPath);
 
-        FlatFileDatabaseOptions options = new()
+        options = new FlatFileDatabaseOptions
         {
-            GovernmentEntitiesFilePath = "GovernmentEntities.txt",
-            GovernmentEntitiesSeedFilePath = "GovernmentEntities.seed.txt",
-            BackupDirectoryPath = "Backups",
-            CreateBackupOnWrite = false
+            GovernmentEntitiesFilePath = DATA_FILE_NAME,
+            GovernmentEntitiesSeedFilePath = SEED_FILE_NAME
         };
 
-        repository = new GovernmentEntityFileRepository(
-            Microsoft.Extensions.Options.Options.Create(options),
-            new TemporaryDirectoryPathResolver(temporaryDirectoryPath),
-            NullLogger<GovernmentEntityFileRepository>.Instance);
+        pathResolver = new TemporaryDirectoryPathResolver(temporaryDirectoryPath);
     }
 
     [Fact]
-    public async Task AddAsync_YLuegoGetByIdAsync_DevuelveLaEntidadPersistida()
+    public async Task GetByIdAsync_DevuelveLaEntidadSembradaConTodosSusCampos()
     {
-        GovernmentEntity entity = BuildEntity("Ministerio de Hacienda", "Ministerio", "Hacienda");
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            "Ministerio de Hacienda|Ministerio|Poder Ejecutivo|Hacienda");
 
-        await repository.AddAsync(entity);
+        GovernmentEntity expectedEntity = (await repository.GetAllAsync()).Single();
 
-        GovernmentEntity? persistedEntity = await repository.GetByIdAsync(entity.Id);
+        GovernmentEntity? persistedEntity = await repository.GetByIdAsync(expectedEntity.Id);
 
         Assert.NotNull(persistedEntity);
-        Assert.Equal(entity.Name, persistedEntity!.Name);
-        Assert.Equal(entity.Category, persistedEntity.Category);
-        Assert.Equal(entity.Sector, persistedEntity.Sector);
-        Assert.Equal(RecordStatus.Active, persistedEntity.Status);
+        Assert.Equal("Ministerio de Hacienda", persistedEntity!.Name);
+        Assert.Equal("Ministerio", persistedEntity.Category);
+        Assert.Equal(STATE_BRANCH, persistedEntity.StateBranch);
+        Assert.Equal("Hacienda", persistedEntity.Sector);
     }
 
     [Fact]
-    public async Task AddAsync_NombreConCaracteresEspecialesYAcentos_SeConservaAlLeer()
+    public async Task GetByIdAsync_IdentificadorInexistente_DevuelveNulo()
     {
-        const string COMPLEX_NAME = "Direccion General de Aduanas | Área de Fiscalización";
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            "Ministerio de Salud|Ministerio|Poder Ejecutivo|Salud");
 
-        GovernmentEntity entity = BuildEntity(COMPLEX_NAME, "Ministerio", "Hacienda");
+        GovernmentEntity? missingEntity = await repository.GetByIdAsync(Guid.NewGuid());
 
-        await repository.AddAsync(entity);
-
-        GovernmentEntity? persistedEntity = await repository.GetByIdAsync(entity.Id);
-
-        Assert.NotNull(persistedEntity);
-        Assert.Equal(COMPLEX_NAME, persistedEntity!.Name);
+        Assert.Null(missingEntity);
     }
 
+    /// <summary>
+    /// El listado oficial lleva acentos y comas. Si el escapado del archivo o la
+    /// codificacion fallaran, el dato volveria distinto de como se escribio.
+    /// </summary>
     [Fact]
-    public async Task UpdateAsync_ModificaSoloLaEntidadIndicada()
+    public async Task GetAllAsync_NombreConAcentosYComas_SeConservaAlLeer()
     {
-        GovernmentEntity firstEntity = BuildEntity("Entidad Uno", "Ministerio", "Hacienda");
-        GovernmentEntity secondEntity = BuildEntity("Entidad Dos", "Ministerio", "Salud");
+        const string ENTITY_NAME =
+            "Direccion General de Migracion, Aduanas y Bienes Nacionales";
 
-        await repository.AddAsync(firstEntity);
-        await repository.AddAsync(secondEntity);
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            $"{ENTITY_NAME}|Organismo Descentralizado|Poder Ejecutivo|Interior");
 
-        firstEntity.Sector = "Educacion";
-        firstEntity.Status = RecordStatus.Inactive;
+        GovernmentEntity persistedEntity = (await repository.GetAllAsync()).Single();
 
-        await repository.UpdateAsync(firstEntity);
-
-        GovernmentEntity? updatedEntity = await repository.GetByIdAsync(firstEntity.Id);
-        GovernmentEntity? untouchedEntity = await repository.GetByIdAsync(secondEntity.Id);
-
-        Assert.Equal("Educacion", updatedEntity!.Sector);
-        Assert.Equal(RecordStatus.Inactive, updatedEntity.Status);
-        Assert.Equal("Salud", untouchedEntity!.Sector);
-        Assert.Equal(RecordStatus.Active, untouchedEntity.Status);
+        Assert.Equal(ENTITY_NAME, persistedEntity.Name);
     }
 
+    /// <summary>
+    /// Es la garantia que sostiene la asociacion de empleados a entidades: el
+    /// archivo de datos se puede borrar y regenerar sin que cambie ningun
+    /// identificador, porque se derivan del nombre.
+    /// </summary>
     [Fact]
-    public async Task DeleteAsync_EliminaLaEntidadDelArchivo()
+    public async Task RegenerarElArchivo_ProduceLosMismosIdentificadores()
     {
-        GovernmentEntity entity = BuildEntity("Entidad Temporal", "Ministerio", "Hacienda");
+        const string SEED_CONTENT = "Tesoreria Nacional|Organismo|Poder Ejecutivo|Hacienda";
 
-        await repository.AddAsync(entity);
-        await repository.DeleteAsync(entity);
+        GovernmentEntityFileRepository firstRepository =
+            await BuildSeededRepositoryAsync(SEED_CONTENT);
 
-        GovernmentEntity? deletedEntity = await repository.GetByIdAsync(entity.Id);
-        IReadOnlyCollection<GovernmentEntity> remainingEntities = await repository.GetAllAsync();
+        Guid identifierBeforeRegeneration = (await firstRepository.GetAllAsync()).Single().Id;
 
-        Assert.Null(deletedEntity);
-        Assert.Empty(remainingEntities);
+        firstRepository.Dispose();
+        File.Delete(Path.Combine(temporaryDirectoryPath, DATA_FILE_NAME));
+
+        GovernmentEntityFileRepository secondRepository =
+            await BuildSeededRepositoryAsync(SEED_CONTENT);
+
+        Guid identifierAfterRegeneration = (await secondRepository.GetAllAsync()).Single().Id;
+
+        Assert.Equal(identifierBeforeRegeneration, identifierAfterRegeneration);
     }
 
     [Fact]
     public async Task SearchAsync_FiltraPorNombreParcialSinDistinguirMayusculas()
     {
-        await repository.AddAsync(BuildEntity("Banco Central", "Organismo", "Hacienda"));
-        await repository.AddAsync(BuildEntity("Banco Agricola", "Empresa Publica", "Agricultura"));
-        await repository.AddAsync(BuildEntity("Acuario Nacional", "Organismo", "Medio Ambiente"));
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            "Banco Central|Organismo|Poder Ejecutivo|Hacienda",
+            "Banco Agricola|Empresa Publica|Poder Ejecutivo|Agricultura",
+            "Acuario Nacional|Organismo|Poder Ejecutivo|Medio Ambiente");
 
-        var searchResult = await repository.SearchAsync(new GovernmentEntityFilterCriteria
-        {
-            Name = "banco"
-        });
+        PagedList<GovernmentEntity> searchResult = await repository.SearchAsync(
+            new GovernmentEntityFilterCriteria { Name = "banco" });
 
         Assert.Equal(2, searchResult.TotalCount);
         Assert.All(searchResult.Items, entity => Assert.Contains("Banco", entity.Name));
@@ -138,15 +141,17 @@ public sealed class GovernmentEntityFileRepositoryTests : IDisposable
     [Fact]
     public async Task SearchAsync_ConVariosFiltros_LosCombinaTodos()
     {
-        await repository.AddAsync(BuildEntity("Entidad A", "Ministerio", "Hacienda"));
-        await repository.AddAsync(BuildEntity("Entidad B", "Ministerio", "Salud"));
-        await repository.AddAsync(BuildEntity("Entidad C", "Organismo", "Hacienda"));
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            "Entidad A|Ministerio|Poder Ejecutivo|Hacienda",
+            "Entidad B|Ministerio|Poder Ejecutivo|Salud",
+            "Entidad C|Organismo|Poder Ejecutivo|Hacienda");
 
-        var searchResult = await repository.SearchAsync(new GovernmentEntityFilterCriteria
-        {
-            Category = "Ministerio",
-            Sector = "Hacienda"
-        });
+        PagedList<GovernmentEntity> searchResult = await repository.SearchAsync(
+            new GovernmentEntityFilterCriteria
+            {
+                Category = "Ministerio",
+                Sector = "Hacienda"
+            });
 
         Assert.Equal(1, searchResult.TotalCount);
         Assert.Equal("Entidad A", searchResult.Items.Single().Name);
@@ -155,19 +160,19 @@ public sealed class GovernmentEntityFileRepositoryTests : IDisposable
     [Fact]
     public async Task SearchAsync_DevuelveSoloLaPaginaSolicitada()
     {
-        for (int index = 1; index <= 25; index++)
-        {
-            await repository.AddAsync(BuildEntity(
-                $"Entidad {index:D2}",
-                "Ministerio",
-                "Hacienda"));
-        }
+        string[] seedLines = Enumerable.Range(1, 25)
+            .Select(index => $"Entidad {index:D2}|Ministerio|Poder Ejecutivo|Hacienda")
+            .ToArray();
 
-        var secondPage = await repository.SearchAsync(new GovernmentEntityFilterCriteria
-        {
-            PageNumber = 2,
-            PageSize = 10
-        });
+        GovernmentEntityFileRepository repository =
+            await BuildSeededRepositoryAsync(seedLines);
+
+        PagedList<GovernmentEntity> secondPage = await repository.SearchAsync(
+            new GovernmentEntityFilterCriteria
+            {
+                PageNumber = 2,
+                PageSize = 10
+            });
 
         Assert.Equal(25, secondPage.TotalCount);
         Assert.Equal(10, secondPage.Items.Count);
@@ -176,24 +181,34 @@ public sealed class GovernmentEntityFileRepositoryTests : IDisposable
         Assert.True(secondPage.HasPreviousPage);
     }
 
+    /// <summary>
+    /// Es la proyeccion que permite resolver el nombre de la entidad de una pagina
+    /// completa de empleados con una sola lectura del catalogo.
+    /// </summary>
     [Fact]
-    public async Task ExistsByNameAsync_IgnoraMayusculasYPuedeExcluirUnRegistro()
+    public async Task GetNamesByIdentifierAsync_DevuelveElNombreDeCadaEntidad()
     {
-        GovernmentEntity entity = BuildEntity("Ministerio de Salud", "Ministerio", "Salud");
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            "Entidad A|Ministerio|Poder Ejecutivo|Hacienda",
+            "Entidad B|Organismo|Poder Ejecutivo|Salud");
 
-        await repository.AddAsync(entity);
+        IReadOnlyCollection<GovernmentEntity> entities = await repository.GetAllAsync();
+        IReadOnlyDictionary<Guid, string> namesByIdentifier =
+            await repository.GetNamesByIdentifierAsync();
 
-        Assert.True(await repository.ExistsByNameAsync("ministerio de salud"));
-        Assert.False(await repository.ExistsByNameAsync("Ministerio de Salud", entity.Id));
-        Assert.False(await repository.ExistsByNameAsync("Ministerio de Educacion"));
+        Assert.Equal(2, namesByIdentifier.Count);
+        Assert.All(
+            entities,
+            entity => Assert.Equal(entity.Name, namesByIdentifier[entity.Id]));
     }
 
     [Fact]
     public async Task GetCatalogsAsync_DevuelveValoresDistintosOrdenados()
     {
-        await repository.AddAsync(BuildEntity("Entidad A", "Ministerio", "Salud"));
-        await repository.AddAsync(BuildEntity("Entidad B", "Ministerio", "Hacienda"));
-        await repository.AddAsync(BuildEntity("Entidad C", "Organismo", "Salud"));
+        GovernmentEntityFileRepository repository = await BuildSeededRepositoryAsync(
+            "Entidad A|Ministerio|Poder Ejecutivo|Salud",
+            "Entidad B|Ministerio|Poder Ejecutivo|Hacienda",
+            "Entidad C|Organismo|Poder Ejecutivo|Salud");
 
         GovernmentEntityCatalogs catalogs = await repository.GetCatalogsAsync();
 
@@ -205,23 +220,36 @@ public sealed class GovernmentEntityFileRepositoryTests : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        repository.Dispose();
-
         if (Directory.Exists(temporaryDirectoryPath))
         {
             Directory.Delete(temporaryDirectoryPath, recursive: true);
         }
     }
 
-    private static GovernmentEntity BuildEntity(string name, string category, string sector) =>
-        new()
-        {
-            Name = name,
-            Category = category,
-            StateBranch = "Poder Ejecutivo",
-            Sector = sector,
-            Status = RecordStatus.Active,
-            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            CreatedBy = CREATION_USER_NAME
-        };
+    /// <summary>
+    /// Escribe el archivo semilla indicado, deja que el inicializador genere el
+    /// archivo de datos y devuelve un repositorio que lo lee.
+    /// </summary>
+    /// <param name="seedLines">Registros semilla, en el formato del listado oficial.</param>
+    /// <returns>Repositorio listo para consultar.</returns>
+    private async Task<GovernmentEntityFileRepository> BuildSeededRepositoryAsync(
+        params string[] seedLines)
+    {
+        await File.WriteAllLinesAsync(
+            Path.Combine(temporaryDirectoryPath, SEED_FILE_NAME),
+            seedLines);
+
+        GovernmentEntityFileInitializer initializer = new(
+            Microsoft.Extensions.Options.Options.Create(options),
+            pathResolver,
+            new FixedDateTimeProvider(),
+            NullLogger<GovernmentEntityFileInitializer>.Instance);
+
+        await initializer.InitializeAsync();
+
+        return new GovernmentEntityFileRepository(
+            Microsoft.Extensions.Options.Options.Create(options),
+            pathResolver,
+            NullLogger<GovernmentEntityFileRepository>.Instance);
+    }
 }

@@ -33,11 +33,17 @@ public abstract class Employee : AuditableEntity
     /// <summary>Numero de seguro social. Identifica al empleado de forma unica.</summary>
     public string SocialSecurityNumber { get; set; } = string.Empty;
 
-    /// <summary>Identificador de la compania que emplea a la persona.</summary>
-    public Guid CompanyId { get; set; }
-
-    /// <summary>Compania que emplea a la persona y que paga su nomina.</summary>
-    public Company? Company { get; set; }
+    /// <summary>
+    /// Identificador de la entidad gubernamental que emplea a la persona.
+    /// </summary>
+    /// <remarks>
+    /// No hay propiedad de navegacion hacia la entidad gubernamental porque los
+    /// dos registros viven en almacenes distintos: el empleado en la base de datos
+    /// relacional y la entidad en el archivo de texto plano. La asociacion se
+    /// resuelve en la capa de servicios, que consulta el catalogo y valida que la
+    /// entidad exista antes de aceptar el empleado.
+    /// </remarks>
+    public Guid GovernmentEntityId { get; set; }
 
     /// <summary>Identificador del departamento al que pertenece el empleado.</summary>
     public Guid DepartmentId { get; set; }

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { companiesApi, payrollApi } from '@/api/payrollEndpoints';
+import { payrollApi } from '@/api/payrollEndpoints';
 import {
   EmptyState,
   ErrorMessage,
@@ -20,12 +20,16 @@ import {
   toInputValue,
   type PayrollWeekValue,
 } from '@/utils/payrollWeek';
-import type { Company, PayrollPreview, PayrollRunDetail } from '@/types/api';
+import type {
+  PayableGovernmentEntity,
+  PayrollPreview,
+  PayrollRunDetail,
+} from '@/types/api';
 
 /**
  * Calculo de pagos semanales.
  *
- * La pantalla materializa el flujo de trabajo del negocio: se elige la compania
+ * La pantalla materializa el flujo de trabajo del negocio: se elige la entidad
  * y la semana, se revisa el calculo propuesto y solo entonces se genera. Si la
  * semana ya fue pagada, el boton de generar queda deshabilitado y se ofrece el
  * enlace a la nomina existente: se impide el error en lugar de reportarlo despues.
@@ -39,7 +43,7 @@ export function PayrollPage() {
     getPreviousWeek(getCurrentWeek()),
   );
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
+  const [selectedGovernmentEntityId, setSelectedGovernmentEntityId] = useState('');
   const [onlyActiveEmployees, setOnlyActiveEmployees] = useState(true);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<unknown>(null);
@@ -47,34 +51,39 @@ export function PayrollPage() {
   const [generatedRun, setGeneratedRun] = useState<PayrollRunDetail | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const companiesQuery = useAsyncData<Company[]>(async () => {
-    const companies = await companiesApi.getAll();
+  // El selector no ofrece las 181 entidades del listado oficial, sino las que
+  // tienen empleados: una entidad sin empleados solo produce un calculo vacio que
+  // la propia API rechaza.
+  const governmentEntitiesQuery = useAsyncData<PayableGovernmentEntity[]>(async () => {
+    const payableEntities = await payrollApi.getPayableEntities();
 
-    // Se preselecciona la primera compania activa para que la pantalla muestre
-    // informacion util sin exigir una interaccion previa.
-    setSelectedCompanyId((previousCompanyId) => {
-      if (previousCompanyId !== '') {
-        return previousCompanyId;
+    // Se preselecciona la primera entidad con empleados activos para que la
+    // pantalla muestre informacion util sin exigir una interaccion previa.
+    setSelectedGovernmentEntityId((previousGovernmentEntityId) => {
+      if (previousGovernmentEntityId !== '') {
+        return previousGovernmentEntityId;
       }
 
-      return companies.find((company) => company.isActive)?.id ?? '';
+      return (
+        payableEntities.find((entity) => entity.activeEmployeeCount > 0)?.id ?? ''
+      );
     });
 
-    return companies;
+    return payableEntities;
   }, []);
 
   const previewQuery = useAsyncData<PayrollPreview | null>(
     () =>
-      selectedCompanyId === ''
+      selectedGovernmentEntityId === ''
         ? Promise.resolve(null)
         : payrollApi.getPreview(
-            selectedCompanyId,
+            selectedGovernmentEntityId,
             selectedWeek.year,
             selectedWeek.weekNumber,
             onlyActiveEmployees,
           ),
     [
-      selectedCompanyId,
+      selectedGovernmentEntityId,
       selectedWeek.year,
       selectedWeek.weekNumber,
       onlyActiveEmployees,
@@ -82,9 +91,12 @@ export function PayrollPage() {
     ],
   );
 
-  const selectedCompany = useMemo(
-    () => (companiesQuery.data ?? []).find((company) => company.id === selectedCompanyId),
-    [companiesQuery.data, selectedCompanyId],
+  const selectedGovernmentEntity = useMemo(
+    () =>
+      (governmentEntitiesQuery.data ?? []).find(
+        (entity) => entity.id === selectedGovernmentEntityId,
+      ),
+    [governmentEntitiesQuery.data, selectedGovernmentEntityId],
   );
 
   const handleWeekChange = useCallback((inputValue: string) => {
@@ -98,7 +110,7 @@ export function PayrollPage() {
   }, []);
 
   async function handleGenerate() {
-    if (selectedCompanyId === '') {
+    if (selectedGovernmentEntityId === '') {
       return;
     }
 
@@ -108,7 +120,7 @@ export function PayrollPage() {
 
     try {
       const detail = await payrollApi.generate({
-        companyId: selectedCompanyId,
+        governmentEntityId: selectedGovernmentEntityId,
         year: selectedWeek.year,
         weekNumber: selectedWeek.weekNumber,
         onlyActiveEmployees,
@@ -117,7 +129,7 @@ export function PayrollPage() {
       setGeneratedRun(detail);
       setSuccessMessage(
         `Nomina de la semana ${detail.summary.weekLabel} generada para ` +
-          `${detail.summary.companyName}. Total pagado: ` +
+          `${detail.summary.governmentEntityName}. Total pagado: ` +
           `${formatCurrency(detail.summary.totalAmount)}.`,
       );
 
@@ -146,32 +158,31 @@ export function PayrollPage() {
           <div>
             <h2 className="card__title">Calculo de pagos de la semana</h2>
             <p className="card__description">
-              Seleccione la compania y la semana, revise el calculo y genere el pago. Una
-              semana solo puede generarse una vez por compania.
+              Seleccione la entidad gubernamental y la semana, revise el calculo y
+              genere el pago. Una semana solo puede generarse una vez por entidad.
             </p>
           </div>
         </div>
 
         <div className="filters">
           <div className="field">
-            <label className="field__label" htmlFor="payrollCompany">
-              Compania
+            <label className="field__label" htmlFor="payrollGovernmentEntity">
+              Entidad gubernamental
             </label>
             <select
-              id="payrollCompany"
+              id="payrollGovernmentEntity"
               className="control"
-              value={selectedCompanyId}
+              value={selectedGovernmentEntityId}
               onChange={(changeEvent) => {
                 setSuccessMessage(null);
                 setOperationError(null);
-                setSelectedCompanyId(changeEvent.target.value);
+                setSelectedGovernmentEntityId(changeEvent.target.value);
               }}
             >
-              <option value="">Seleccione una compania</option>
-              {(companiesQuery.data ?? []).map((company) => (
-                <option key={company.id} value={company.id} disabled={!company.isActive}>
-                  {company.name}
-                  {company.isActive ? '' : ' (inactiva)'}
+              <option value="">Seleccione una entidad gubernamental</option>
+              {(governmentEntitiesQuery.data ?? []).map((entity) => (
+                <option key={entity.id} value={entity.id}>
+                  {entity.name} ({entity.activeEmployeeCount} activos)
                 </option>
               ))}
             </select>
@@ -217,22 +228,22 @@ export function PayrollPage() {
         <ErrorMessage error={operationError} />
       </section>
 
-      {selectedCompanyId === '' && (
+      {selectedGovernmentEntityId === '' && (
         <section className="card">
           <EmptyState
-            title="Seleccione una compania"
-            description="El calculo de la nomina se realiza por compania y por semana."
+            title="Seleccione una entidad gubernamental"
+            description="El calculo de la nomina se realiza por entidad y por semana."
           />
         </section>
       )}
 
-      {selectedCompanyId !== '' && previewQuery.isLoading && (
+      {selectedGovernmentEntityId !== '' && previewQuery.isLoading && (
         <section className="card">
           <LoadingIndicator label="Calculando la nomina de la semana..." />
         </section>
       )}
 
-      {selectedCompanyId !== '' && previewQuery.error && (
+      {selectedGovernmentEntityId !== '' && previewQuery.error && (
         <section className="card">
           <ErrorMessage error={previewQuery.error} />
         </section>
@@ -266,7 +277,7 @@ export function PayrollPage() {
                     preview.isAlreadyGenerated
                       ? 'La semana ya tiene nomina generada'
                       : preview.employeeCount === 0
-                        ? 'La compania no tiene empleados que incluir'
+                        ? 'La entidad no tiene empleados que incluir'
                         : 'Generar el pago de la semana'
                   }
                 >
@@ -295,8 +306,10 @@ export function PayrollPage() {
                   <PayrollIcon size={22} />
                 </span>
                 <div>
-                  <p className="metric-card__label">Compania</p>
-                  <p style={{ fontWeight: 600 }}>{selectedCompany?.name ?? preview.companyName}</p>
+                  <p className="metric-card__label">Entidad gubernamental</p>
+                  <p style={{ fontWeight: 600 }}>
+                    {selectedGovernmentEntity?.name ?? preview.governmentEntityName}
+                  </p>
                 </div>
               </div>
               <div className="metric-card">
@@ -326,8 +339,8 @@ export function PayrollPage() {
 
             {preview.employeeCount === 0 ? (
               <EmptyState
-                title="La compania no tiene empleados que incluir"
-                description="Registre empleados activos en esta compania o cambie el alcance a todos los empleados."
+                title="La entidad no tiene empleados que incluir"
+                description="Registre empleados activos en esta entidad o cambie el alcance a todos los empleados."
               />
             ) : (
               <PayrollLinesTable lines={preview.lines} totalAmount={preview.totalAmount} />

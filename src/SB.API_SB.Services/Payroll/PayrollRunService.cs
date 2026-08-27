@@ -16,7 +16,7 @@ using SB.API_SB.Domain.ValueObjects;
 namespace SB.API_SB.Services.Payroll;
 
 /// <summary>
-/// Implementacion del calculo de pagos semanales por compania.
+/// Implementacion del calculo de pagos semanales por entidad gubernamental.
 /// </summary>
 /// <remarks>
 /// La regla central del modulo es que una semana se paga una sola vez. Se aplica
@@ -28,10 +28,11 @@ namespace SB.API_SB.Services.Payroll;
 public sealed class PayrollRunService : IPayrollRunService
 {
     private const string PAYROLL_RUN_ENTITY_NAME = "la ejecucion de nomina";
-    private const string COMPANY_ENTITY_NAME = "la compania";
+    private const string GOVERNMENT_ENTITY_NAME = "la entidad gubernamental";
+    private const string UNKNOWN_GOVERNMENT_ENTITY_NAME = "Entidad no disponible";
 
     private readonly IPayrollRunRepository payrollRunRepository;
-    private readonly ICompanyRepository companyRepository;
+    private readonly IGovernmentEntityRepository governmentEntityRepository;
     private readonly IEmployeeRepository employeeRepository;
     private readonly IPayrollCalculator payrollCalculator;
     private readonly IDateTimeProvider dateTimeProvider;
@@ -40,7 +41,7 @@ public sealed class PayrollRunService : IPayrollRunService
 
     public PayrollRunService(
         IPayrollRunRepository payrollRunRepository,
-        ICompanyRepository companyRepository,
+        IGovernmentEntityRepository governmentEntityRepository,
         IEmployeeRepository employeeRepository,
         IPayrollCalculator payrollCalculator,
         IDateTimeProvider dateTimeProvider,
@@ -48,7 +49,7 @@ public sealed class PayrollRunService : IPayrollRunService
         ILogger<PayrollRunService> logger)
     {
         this.payrollRunRepository = payrollRunRepository;
-        this.companyRepository = companyRepository;
+        this.governmentEntityRepository = governmentEntityRepository;
         this.employeeRepository = employeeRepository;
         this.payrollCalculator = payrollCalculator;
         this.dateTimeProvider = dateTimeProvider;
@@ -58,22 +59,24 @@ public sealed class PayrollRunService : IPayrollRunService
 
     /// <inheritdoc />
     public async Task<PayrollPreviewResponse> PreviewAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         int year,
         int weekNumber,
         bool onlyActiveEmployees,
         CancellationToken cancellationToken = default)
     {
-        Company company = await GetRequiredCompanyAsync(companyId, cancellationToken);
+        GovernmentEntity governmentEntity = await GetRequiredGovernmentEntityAsync(
+            governmentEntityId,
+            cancellationToken);
         PayrollWeek payrollWeek = PayrollWeek.Create(year, weekNumber);
 
         PayrollRun? existingRun = await payrollRunRepository.FindGeneratedRunAsync(
-            companyId,
+            governmentEntityId,
             payrollWeek,
             cancellationToken);
 
         IReadOnlyCollection<PayrollRunLine> lines = await BuildLinesAsync(
-            companyId,
+            governmentEntityId,
             payrollWeek,
             onlyActiveEmployees,
             cancellationToken);
@@ -83,9 +86,9 @@ public sealed class PayrollRunService : IPayrollRunService
             .ToList();
 
         logger.LogInformation(
-            "Vista previa de nomina para {CompanyName}, semana {WeekLabel}. " +
+            "Vista previa de nomina para {GovernmentEntityName}, semana {WeekLabel}. " +
             "Empleados: {EmployeeCount}. Total: {TotalAmount}. Ya generada: {IsAlreadyGenerated}.",
-            company.Name,
+            governmentEntity.Name,
             payrollWeek.Label,
             lineResponses.Count,
             lineResponses.Sum(line => line.WeeklyPayment),
@@ -93,8 +96,8 @@ public sealed class PayrollRunService : IPayrollRunService
 
         return new PayrollPreviewResponse
         {
-            CompanyId = company.Id,
-            CompanyName = company.Name,
+            GovernmentEntityId = governmentEntity.Id,
+            GovernmentEntityName = governmentEntity.Name,
             Year = payrollWeek.Year,
             WeekNumber = payrollWeek.WeekNumber,
             WeekLabel = payrollWeek.Label,
@@ -121,12 +124,15 @@ public sealed class PayrollRunService : IPayrollRunService
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Company company = await GetRequiredCompanyAsync(request.CompanyId, cancellationToken);
+        GovernmentEntity governmentEntity = await GetRequiredGovernmentEntityAsync(
+            request.GovernmentEntityId,
+            cancellationToken);
 
-        if (!company.IsActive)
+        if (governmentEntity.Status != RecordStatus.Active)
         {
             throw new BusinessRuleViolationException(
-                $"La compania '{company.Name}' esta inactiva y no admite generacion de nomina.");
+                $"La entidad gubernamental '{governmentEntity.Name}' esta inactiva y no " +
+                "admite generacion de nomina.");
         }
 
         PayrollWeek payrollWeek = PayrollWeek.Create(request.Year, request.WeekNumber);
@@ -143,28 +149,28 @@ public sealed class PayrollRunService : IPayrollRunService
         }
 
         PayrollRun? existingRun = await payrollRunRepository.FindGeneratedRunAsync(
-            request.CompanyId,
+            request.GovernmentEntityId,
             payrollWeek,
             cancellationToken);
 
         if (existingRun is not null)
         {
             logger.LogWarning(
-                "Se rechazo la generacion de nomina de {CompanyName} para la semana " +
+                "Se rechazo la generacion de nomina de {GovernmentEntityName} para la semana " +
                 "{WeekLabel}: ya existe la ejecucion {ExistingPayrollRunId}.",
-                company.Name,
+                governmentEntity.Name,
                 payrollWeek.Label,
                 existingRun.Id);
 
             throw new DuplicatedPayrollRunException(
-                company.Name,
+                governmentEntity.Name,
                 payrollWeek.Year,
                 payrollWeek.WeekNumber,
                 existingRun.Id);
         }
 
         IReadOnlyCollection<PayrollRunLine> lines = await BuildLinesAsync(
-            request.CompanyId,
+            request.GovernmentEntityId,
             payrollWeek,
             request.OnlyActiveEmployees,
             cancellationToken);
@@ -172,13 +178,14 @@ public sealed class PayrollRunService : IPayrollRunService
         if (lines.Count == 0)
         {
             throw new BusinessRuleViolationException(
-                $"La compania '{company.Name}' no tiene empleados que incluir en la nomina de " +
-                $"la semana {payrollWeek.Label}.");
+                $"La entidad gubernamental '{governmentEntity.Name}' no tiene empleados " +
+                $"que incluir en la nomina de la semana {payrollWeek.Label}.");
         }
 
         PayrollRun payrollRun = new()
         {
-            CompanyId = company.Id,
+            GovernmentEntityId = governmentEntity.Id,
+            GovernmentEntityName = governmentEntity.Name,
             Status = PayrollRunStatus.Generated
         };
 
@@ -195,15 +202,47 @@ public sealed class PayrollRunService : IPayrollRunService
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Nomina generada para {CompanyName}, semana {WeekLabel}. Ejecucion: {PayrollRunId}. " +
-            "Empleados: {EmployeeCount}. Total: {TotalAmount}.",
-            company.Name,
+            "Nomina generada para {GovernmentEntityName}, semana {WeekLabel}. " +
+            "Ejecucion: {PayrollRunId}. Empleados: {EmployeeCount}. " +
+            "Total: {TotalAmount}.",
+            governmentEntity.Name,
             payrollWeek.Label,
             payrollRun.Id,
             payrollRun.EmployeeCount,
             payrollRun.TotalAmount);
 
         return await GetByIdAsync(payrollRun.Id, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyCollection<PayableGovernmentEntityResponse>>
+        GetPayableEntitiesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyCollection<GovernmentEntityEmployeeCount> employeeCounts =
+            await employeeRepository.CountByGovernmentEntityAsync(cancellationToken);
+
+        if (employeeCounts.Count == 0)
+        {
+            return Array.Empty<PayableGovernmentEntityResponse>();
+        }
+
+        IReadOnlyDictionary<Guid, string> governmentEntityNames =
+            await governmentEntityRepository.GetNamesByIdentifierAsync(cancellationToken);
+
+        return employeeCounts
+            .Select(employeeCount => new PayableGovernmentEntityResponse
+            {
+                Id = employeeCount.GovernmentEntityId,
+                Name = governmentEntityNames.TryGetValue(
+                    employeeCount.GovernmentEntityId,
+                    out string? name)
+                    ? name
+                    : UNKNOWN_GOVERNMENT_ENTITY_NAME,
+                TotalEmployeeCount = employeeCount.TotalEmployeeCount,
+                ActiveEmployeeCount = employeeCount.ActiveEmployeeCount
+            })
+            .OrderBy(entity => entity.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
     }
 
     /// <inheritdoc />
@@ -215,7 +254,7 @@ public sealed class PayrollRunService : IPayrollRunService
 
         PayrollRunFilterCriteria criteria = new()
         {
-            CompanyId = filter.CompanyId,
+            GovernmentEntityId = filter.GovernmentEntityId,
             Year = filter.Year,
             IncludeCancelled = filter.IncludeCancelled,
             PageNumber = filter.PageNumber,
@@ -227,9 +266,9 @@ public sealed class PayrollRunService : IPayrollRunService
             cancellationToken);
 
         logger.LogInformation(
-            "Consulta del historial de nomina. Compania: {CompanyId}. Ano: {Year}. " +
-            "Resultados: {TotalCount}.",
-            filter.CompanyId,
+            "Consulta del historial de nomina. Entidad: {GovernmentEntityId}. " +
+            "Ano: {Year}. Resultados: {TotalCount}.",
+            filter.GovernmentEntityId,
             filter.Year,
             payrollRuns.TotalCount);
 
@@ -289,21 +328,21 @@ public sealed class PayrollRunService : IPayrollRunService
 
     /// <inheritdoc />
     public async Task<GeneratedWeeksResponse> GetGeneratedWeeksAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         int year,
         CancellationToken cancellationToken = default)
     {
-        await GetRequiredCompanyAsync(companyId, cancellationToken);
+        await GetRequiredGovernmentEntityAsync(governmentEntityId, cancellationToken);
 
         IReadOnlyCollection<int> generatedWeekNumbers =
             await payrollRunRepository.GetGeneratedWeekNumbersAsync(
-                companyId,
+                governmentEntityId,
                 year,
                 cancellationToken);
 
         return new GeneratedWeeksResponse
         {
-            CompanyId = companyId,
+            GovernmentEntityId = governmentEntityId,
             Year = year,
             WeeksInYear = System.Globalization.ISOWeek.GetWeeksInYear(year),
             GeneratedWeekNumbers = generatedWeekNumbers
@@ -311,22 +350,33 @@ public sealed class PayrollRunService : IPayrollRunService
     }
 
     private async Task<IReadOnlyCollection<PayrollRunLine>> BuildLinesAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         PayrollWeek payrollWeek,
         bool onlyActiveEmployees,
         CancellationToken cancellationToken)
     {
         IReadOnlyCollection<Employee> employees = await employeeRepository.GetForPayrollAsync(
-            companyId,
+            governmentEntityId,
             onlyActiveEmployees,
             cancellationToken);
 
         return payrollCalculator.BuildLines(employees, payrollWeek);
     }
 
-    private async Task<Company> GetRequiredCompanyAsync(
-        Guid companyId,
+    /// <summary>
+    /// Obtiene la entidad gubernamental del catalogo, o falla si no existe.
+    /// </summary>
+    /// <remarks>
+    /// La entidad se lee del archivo de texto plano y no de la base de datos
+    /// relacional. Es tambien la comprobacion que sustituye a la clave foranea que
+    /// no puede existir entre los dos almacenes.
+    /// </remarks>
+    /// <param name="governmentEntityId">Entidad solicitada.</param>
+    /// <param name="cancellationToken">Token de cancelacion.</param>
+    /// <returns>La entidad gubernamental.</returns>
+    private async Task<GovernmentEntity> GetRequiredGovernmentEntityAsync(
+        Guid governmentEntityId,
         CancellationToken cancellationToken) =>
-        await companyRepository.GetByIdAsync(companyId, cancellationToken)
-            ?? throw new EntityNotFoundException(COMPANY_ENTITY_NAME, companyId);
+        await governmentEntityRepository.GetByIdAsync(governmentEntityId, cancellationToken)
+            ?? throw new EntityNotFoundException(GOVERNMENT_ENTITY_NAME, governmentEntityId);
 }

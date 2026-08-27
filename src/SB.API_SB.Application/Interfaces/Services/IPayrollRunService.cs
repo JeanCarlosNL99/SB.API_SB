@@ -9,7 +9,7 @@ namespace SB.API_SB.Application.Interfaces.Services;
 /// <remarks>
 /// El flujo de trabajo es: consultar la vista previa de la semana, generar la
 /// ejecucion y consultarla despues en el historial. La generacion es la unica
-/// operacion que persiste datos, y solo se admite una vez por compania y semana.
+/// operacion que persiste datos, y solo se admite una vez por entidad gubernamental y semana.
 /// </remarks>
 public interface IPayrollRunService
 {
@@ -17,14 +17,14 @@ public interface IPayrollRunService
     /// Calcula la nomina de una semana sin almacenarla, para revisarla antes de
     /// generarla. Informa tambien si la semana ya fue pagada.
     /// </summary>
-    /// <param name="companyId">Compania a calcular.</param>
+    /// <param name="governmentEntityId">Entidad gubernamental a calcular.</param>
     /// <param name="year">Ano de la semana.</param>
     /// <param name="weekNumber">Numero de semana.</param>
     /// <param name="onlyActiveEmployees">Indica si se limita a empleados activos.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Calculo propuesto para la semana.</returns>
     Task<PayrollPreviewResponse> PreviewAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         int year,
         int weekNumber,
         bool onlyActiveEmployees,
@@ -33,14 +33,23 @@ public interface IPayrollRunService
     /// <summary>
     /// Genera y almacena la nomina de una semana.
     /// </summary>
-    /// <param name="request">Compania, semana y alcance del calculo.</param>
+    /// <param name="request">Entidad gubernamental, semana y alcance del calculo.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>La ejecucion generada, con su detalle.</returns>
     /// <exception cref="Domain.Exceptions.DuplicatedPayrollRunException">
-    /// Si la compania ya tiene una ejecucion vigente para esa semana.
+    /// Si la entidad gubernamental ya tiene una ejecucion vigente para esa semana.
     /// </exception>
     Task<PayrollRunDetailResponse> GenerateAsync(
         GeneratePayrollRunRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Obtiene las entidades gubernamentales que tienen empleados registrados y
+    /// por tanto nomina que calcular.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelacion.</param>
+    /// <returns>Entidades con nomina, ordenadas por nombre.</returns>
+    Task<IReadOnlyCollection<PayableGovernmentEntityResponse>> GetPayableEntitiesAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>Consulta el historial de ejecuciones de nomina.</summary>
@@ -72,13 +81,13 @@ public interface IPayrollRunService
         CancelPayrollRunRequest request,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Obtiene las semanas ya pagadas por una compania en un ano.</summary>
-    /// <param name="companyId">Compania consultada.</param>
+    /// <summary>Obtiene las semanas ya pagadas por una entidad gubernamental en un ano.</summary>
+    /// <param name="governmentEntityId">Entidad gubernamental consultada.</param>
     /// <param name="year">Ano consultado.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Semanas con nomina vigente.</returns>
     Task<GeneratedWeeksResponse> GetGeneratedWeeksAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         int year,
         CancellationToken cancellationToken = default);
 }

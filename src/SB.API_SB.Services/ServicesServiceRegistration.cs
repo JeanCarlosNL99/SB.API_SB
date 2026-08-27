@@ -27,7 +27,6 @@ public static class ServicesServiceRegistration
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IGovernmentEntityService, GovernmentEntityService>();
-        services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<IPayrollRunService, PayrollRunService>();
         services.AddScoped<IEventLogService, EventLogService>();
 

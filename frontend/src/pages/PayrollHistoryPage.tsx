@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { companiesApi, payrollApi } from '@/api/payrollEndpoints';
+import { payrollApi } from '@/api/payrollEndpoints';
 import {
   EmptyState,
   ErrorMessage,
@@ -15,7 +15,7 @@ import { formatCurrency, formatDate, formatDateTime } from '@/utils/formatters';
 import { buildClickableRowProps } from '@/utils/tableInteraction';
 import { getCurrentWeek } from '@/utils/payrollWeek';
 import type {
-  Company,
+  PayableGovernmentEntity,
   PagedResponse,
   PayrollRunDetail,
   PayrollRunFilter,
@@ -25,7 +25,7 @@ import type {
 const MINIMUM_CANCELLATION_REASON_LENGTH = 10;
 
 const INITIAL_FILTER: PayrollRunFilter = {
-  companyId: '',
+  governmentEntityId: '',
   year: '',
   includeCancelled: true,
   pageNumber: 1,
@@ -50,12 +50,15 @@ export function PayrollHistoryPage() {
   const [operationError, setOperationError] = useState<unknown>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const companiesQuery = useAsyncData<Company[]>(() => companiesApi.getAll(), []);
+  const governmentEntitiesQuery = useAsyncData<PayableGovernmentEntity[]>(
+    () => payrollApi.getPayableEntities(),
+    [],
+  );
 
   const historyQuery = useAsyncData<PagedResponse<PayrollRunSummary>>(
     () => payrollApi.searchHistory(filter),
     [
-      filter.companyId,
+      filter.governmentEntityId,
       filter.year,
       filter.includeCancelled,
       filter.pageNumber,
@@ -95,7 +98,7 @@ export function PayrollHistoryPage() {
 
       setSuccessMessage(
         `La nomina de la semana ${runBeingCancelled.weekLabel} de ` +
-          `${runBeingCancelled.companyName} fue anulada. La semana queda libre para ` +
+          `${runBeingCancelled.governmentEntityName} fue anulada. La semana queda libre para ` +
           'volver a calcularse.',
       );
 
@@ -119,28 +122,29 @@ export function PayrollHistoryPage() {
           <div>
             <h2 className="card__title">Filtros del historial</h2>
             <p className="card__description">
-              Cada registro es la nomina de una compania para una semana concreta.
+              Cada registro es la nomina de una entidad gubernamental para una semana
+              concreta.
             </p>
           </div>
         </div>
 
         <div className="filters">
           <div className="field">
-            <label className="field__label" htmlFor="historyCompany">
-              Compania
+            <label className="field__label" htmlFor="historyGovernmentEntity">
+              Entidad gubernamental
             </label>
             <select
-              id="historyCompany"
+              id="historyGovernmentEntity"
               className="control"
-              value={filter.companyId ?? ''}
+              value={filter.governmentEntityId ?? ''}
               onChange={(changeEvent) =>
-                updateFilter({ companyId: changeEvent.target.value })
+                updateFilter({ governmentEntityId: changeEvent.target.value })
               }
             >
               <option value="">Todas</option>
-              {(companiesQuery.data ?? []).map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
+              {(governmentEntitiesQuery.data ?? []).map((entity) => (
+                <option key={entity.id} value={entity.id}>
+                  {entity.name}
                 </option>
               ))}
             </select>
@@ -218,7 +222,7 @@ export function PayrollHistoryPage() {
                     <tr>
                       <th>Semana</th>
                       <th>Periodo</th>
-                      <th>Compania</th>
+                      <th>Entidad gubernamental</th>
                       <th className="table th--numeric">Empleados</th>
                       <th className="table th--numeric">Total pagado</th>
                       <th>Estado</th>
@@ -232,7 +236,7 @@ export function PayrollHistoryPage() {
                         key={summary.id}
                         {...buildClickableRowProps(
                           () => void openDetail(summary),
-                          `Ver la nomina ${summary.weekLabel} de ${summary.companyName}`,
+                          `Ver la nomina ${summary.weekLabel} de ${summary.governmentEntityName}`,
                         )}
                       >
                         <td>
@@ -242,7 +246,7 @@ export function PayrollHistoryPage() {
                           {formatDate(summary.weekStartDate)} —{' '}
                           {formatDate(summary.weekEndDate)}
                         </td>
-                        <td className="table td--wrap">{summary.companyName}</td>
+                        <td className="table td--wrap">{summary.governmentEntityName}</td>
                         <td className="table td--numeric">{summary.employeeCount}</td>
                         <td className="table td--numeric">
                           {formatCurrency(summary.totalAmount)}
@@ -321,7 +325,7 @@ export function PayrollHistoryPage() {
           <div>
             <p>
               Se anulara la nomina de la semana <strong>{runBeingCancelled.weekLabel}</strong> de{' '}
-              <strong>{runBeingCancelled.companyName}</strong>, por{' '}
+              <strong>{runBeingCancelled.governmentEntityName}</strong>, por{' '}
               {formatCurrency(runBeingCancelled.totalAmount)}.
             </p>
 

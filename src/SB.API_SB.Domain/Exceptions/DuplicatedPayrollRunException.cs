@@ -1,7 +1,7 @@
 namespace SB.API_SB.Domain.Exceptions;
 
 /// <summary>
-/// Se lanza al intentar generar la nomina de una semana que la compania ya pago.
+/// Se lanza al intentar generar la nomina de una semana que la entidad gubernamental ya pago.
 /// </summary>
 /// <remarks>
 /// Es una excepcion propia y no un duplicado generico porque el cliente necesita
@@ -11,22 +11,23 @@ namespace SB.API_SB.Domain.Exceptions;
 public sealed class DuplicatedPayrollRunException : DomainException
 {
     public DuplicatedPayrollRunException(
-        string companyName,
+        string governmentEntityName,
         int year,
         int weekNumber,
         Guid existingPayrollRunId)
-        : base($"La compania '{companyName}' ya tiene la nomina de la semana {weekNumber} " +
-               $"del ano {year} generada. Una semana solo puede pagarse una vez; anule la " +
-               $"ejecucion existente si necesita volver a calcularla.")
+        : base($"La entidad gubernamental '{governmentEntityName}' ya tiene la nomina " +
+               $"de la semana {weekNumber} del ano {year} generada. Una semana solo puede " +
+               "pagarse una vez; anule la ejecucion existente si necesita volver a " +
+               "calcularla.")
     {
-        CompanyName = companyName;
+        GovernmentEntityName = governmentEntityName;
         Year = year;
         WeekNumber = weekNumber;
         ExistingPayrollRunId = existingPayrollRunId;
     }
 
-    /// <summary>Compania que ya tiene la semana pagada.</summary>
-    public string CompanyName { get; }
+    /// <summary>Entidad gubernamental que ya tiene la semana pagada.</summary>
+    public string GovernmentEntityName { get; }
 
     /// <summary>Ano de la semana en conflicto.</summary>
     public int Year { get; }

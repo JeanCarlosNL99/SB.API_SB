@@ -13,19 +13,20 @@ razonamiento detrás de cada una.
 | Arquitectura backend | Onion Architecture (5 proyectos) |
 | API | ASP.NET Core Web API, REST, controladores |
 | Persistencia relacional | Entity Framework Core 8 (SQL Server / SQLite) |
-| Persistencia de texto plano | Repositorio propio sobre archivo delimitado |
+| Persistencia de texto plano | Repositorio propio de solo lectura sobre archivo delimitado |
 | Autenticación | JWT `Authorization: Bearer`, HMAC-SHA256 |
 | Contraseñas | PBKDF2 (Rfc2898) + SHA-256, 100,000 iteraciones |
 | Validaciones | FluentValidation con reglas condicionales por tipo |
 | Registro de eventos | Serilog (consola + archivo diario) |
 | Documentación | Swagger / OpenAPI con esquema de seguridad Bearer |
-| Pruebas | xUnit + NSubstitute — 98 pruebas |
+| Pruebas | xUnit + NSubstitute — 107 pruebas |
 | Frontend | React 18 + TypeScript 5 + Vite 5 |
 | Cliente HTTP | Axios con interceptores |
 
 Volumen: **≈ 130 archivos de código**, 5 proyectos .NET, 1 proyecto de pruebas y
-1 aplicación web. 181 entidades gubernamentales cargadas del listado oficial y un
-historial de nómina sembrado de 24 ejecuciones.
+1 aplicación web. 181 entidades gubernamentales cargadas del listado oficial, 11
+empleados repartidos entre cuatro de ellas y un historial de nómina sembrado de 32
+ejecuciones.
 
 ---
 
@@ -81,10 +82,10 @@ proyecto:
    gubernamentales viven en un archivo de texto y los empleados en una base
    relacional. Ningún servicio distingue una de otra porque ambas satisfacen
    contratos del Dominio.
-3. **Las reglas de negocio se prueban sin infraestructura.** De las 98 pruebas,
-   ninguna necesita una base de datos ni un servidor web (la única que toca disco
-   es la del repositorio de texto plano, y por diseño: verifica precisamente ese
-   viaje).
+3. **Las reglas de negocio se prueban sin infraestructura.** De las 107 pruebas,
+   ninguna necesita una base de datos ni un servidor web (las únicas que tocan
+   disco son las del repositorio de texto plano, y por diseño: verifican
+   precisamente ese viaje).
 4. **Cambiar de SQL Server a SQLite es una línea de configuración.** Está
    demostrado: el proyecto se ejecuta con SQLite en desarrollo y está configurado
    para SQL Server en producción, con el mismo `DbContext` y los mismos mapeos.
@@ -232,7 +233,7 @@ independientes, y cada uno resuelve un problema distinto:
 |---|---|---|
 | **Interfaz** | La vista previa consulta el estado de la semana y deshabilita el botón | Evita que el usuario intente una operación que va a fallar. |
 | **Servicio** | Comprueba la existencia y lanza `DuplicatedPayrollRunException` → HTTP 409 con el identificador de la nómina existente | Da un mensaje que explica la regla y permite ir al documento existente. |
-| **Base de datos** | Índice único filtrado `IX_PayrollRuns_Company_Year_Week_Vigente` sobre `(CompanyId, Year, WeekNumber) WHERE Status = 1` | Cierra la ventana de la condición de carrera entre dos peticiones simultáneas. |
+| **Base de datos** | Índice único filtrado `IX_PayrollRuns_Entidad_Ano_Semana_Vigente` sobre `(GovernmentEntityId, Year, WeekNumber) WHERE Status = 1` | Cierra la ventana de la condición de carrera entre dos peticiones simultáneas. |
 
 **El tercer nivel es el que de verdad garantiza la regla.** La comprobación del
 servicio consulta y luego inserta; entre ambas operaciones cabe otra petición. Sin
@@ -260,17 +261,25 @@ empleado su propio pago y su propio desglose. No contiene ninguna fórmula.
 | Regla | Motivo |
 |---|---|
 | No se puede generar la nómina de una semana que aún no ha comenzado | Las horas trabajadas y las ventas de esa semana todavía no existen. |
-| No se puede generar la nómina de una compañía sin empleados | Un documento de pago vacío no significa nada. |
-| No se puede generar la nómina de una compañía inactiva | Una compañía dada de baja no paga. |
+| No se puede generar la nómina de una entidad sin empleados | Un documento de pago vacío no significa nada. |
+| No se puede generar la nómina de una entidad gubernamental inactiva | Una entidad dada de baja no paga. |
 | Anular exige un motivo de al menos 10 caracteres | La anulación queda como evidencia; «error» no explica nada. |
 | Solo un administrador puede anular | Es la operación que permite reescribir un pago ya emitido. |
-| No se puede eliminar una compañía con nóminas en el historial | El historial de pagos debe conservarse. |
+| No se puede asignar un empleado a una entidad ausente del listado oficial | Es la comprobación que sustituye a la clave foránea que no puede existir entre los dos almacenes. |
 
 ### 4.6 Datos de demostración del historial
 
 `PayrollHistorySeeder` genera, en el primer arranque, las **ocho semanas anteriores
-a la actual para cada una de las tres compañías**: 24 ejecuciones con sus líneas y
-componentes.
+a la actual para cada una de las cuatro entidades gubernamentales con empleados**:
+32 ejecuciones con sus líneas y componentes.
+
+Las entidades no se inventan. Los empleados de demostración se asignan a cuatro
+entidades reales del listado oficial: Dirección General de Impuestos Internos,
+Ministerio de Hacienda y Economía, Oficina Gubernamental de Tecnologías de la
+Información y Comunicación y Superintendencia del Mercado de Valores. El sembrado
+las localiza por nombre con una comparación que ignora acentos, de modo que el
+código fuente se mantiene en ASCII sin dejar de coincidir con el listado oficial,
+que sí los lleva.
 
 Las semanas históricas no se calculan con los datos vigentes de cada empleado: se
 aplica una variación por semana a las horas trabajadas y a las ventas, de modo que
@@ -280,8 +289,14 @@ del número de semana con una fórmula determinista y **no de un generador
 aleatorio**: el sembrado es reproducible, lo que importa cuando alguien pregunta
 por qué un total no coincide con lo que vio ayer.
 
-La semana en curso y la anterior se dejan deliberadamente sin generar, para que el
-evaluador pueda probar el flujo completo de generación.
+Cada nómina histórica queda registrada con la fecha en que se habría generado, no
+con la del sembrado. Para conseguirlo, el sellado automático de auditoría respeta
+la fecha que la entidad ya trae asignada: sobrescribirla haría que ocho semanas de
+histórico aparecieran creadas en el mismo instante, y el historial dejaría de
+parecerse a uno real.
+
+La semana en curso se deja deliberadamente sin generar, para que el evaluador
+pueda probar el flujo completo de generación.
 
 ---
 
@@ -332,12 +347,18 @@ Verificado con un usuario de rol Consultor: `GET /api/registro-eventos` responde
 
 ## 6. La base de datos de texto plano
 
-El requerimiento pide un archivo de texto plano dentro del proyecto. Un archivo
-de texto no ofrece transacciones, ni control de concurrencia, ni integridad
+El requerimiento pide un archivo de texto plano dentro del proyecto. Un archivo de
+texto no ofrece transacciones, ni control de concurrencia, ni integridad
 referencial. La implementación compensa cada una de esas carencias de forma
 explícita.
 
-### 4.1 Formato
+El listado oficial es un **catálogo de solo lectura**: se distribuye con la
+aplicación y la aplicación lo consulta, no lo administra. Por eso el repositorio no
+expone operaciones de escritura, y el contrato del Dominio
+(`IGovernmentEntityRepository`) tampoco las declara. Declarar operaciones que nadie
+implementa ni consume solo invitaría a usarlas.
+
+### 6.1 Formato
 
 Archivo delimitado por barra vertical, con encabezado autodescriptivo:
 
@@ -346,36 +367,58 @@ Archivo delimitado por barra vertical, con encabezado autodescriptivo:
 # Campos: Id|Nombre|Categoria|PoderDelEstado|Sector|Estado|CreadoEnUtc|CreadoPor|ActualizadoEnUtc|ActualizadoPor
 # Estado: 1 = Activo, 2 = Inactivo
 # El caracter | dentro de un valor se almacena escapado como \p
-ae945ce9-...|Acuario Nacional|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales|1|2026-08-26T19:46:35.9890677Z|Semilla||
+629e9195-4612-884e-b4d5-9151a1824a0d|Acuario Nacional|Organismo Descentralizado Funcionalmente|Poder Ejecutivo|Medio Ambiente y Recursos Naturales|1|2026-08-27T02:11:03.9695637Z|Semilla||
 ```
 
-### 4.2 Los cuatro problemas resueltos
+### 6.2 Los problemas del formato plano y su solución
 
 | Problema del formato plano | Solución implementada |
 |---|---|
-| Un valor con `\|` rompe el formato | Escape reversible: `\` → `\\`, `\|` → `\p`, salto de línea → `\n`. Verificado en `FlatFileRecordSerializerTests` con seis casos límite. |
-| Dos peticiones simultáneas se pisan | `SemaphoreSlim` serializa todo acceso; el repositorio es singleton para que la garantía cubra la aplicación entera. |
-| Una interrupción deja el archivo a medio escribir | Escritura atómica: se escribe un `.tmp` completo y solo entonces se reemplaza el original. Además, copia de respaldo con estampa de tiempo antes de cada reescritura. |
-| Leer el archivo en cada consulta es costoso | Cache en memoria invalidada al escribir. Ante un fallo de escritura la cache se descarta para que la siguiente lectura vuelva a la única fuente de verdad. |
+| Un valor con `\|` rompe el formato | Escape reversible: `\` → `\`, `\|` → `\p`, salto de línea → `\n`. Verificado en `FlatFileRecordSerializerTests` con seis casos límite. |
+| Leer el archivo en cada consulta es costoso | Cache en memoria; la carga inicial se serializa con un `SemaphoreSlim` y el repositorio es singleton, de modo que toda la aplicación comparte una única lectura del disco. |
+| Un identificador aleatorio rompería las referencias al regenerar el archivo | Los identificadores se derivan del nombre oficial de cada entidad. Ver la sección siguiente. |
 
-Las lecturas devuelven **copias** de la cache, de modo que ningún consumidor
-puede alterar el estado interno del repositorio por accidente.
+Las lecturas devuelven **copias** de la cache, de modo que ningún consumidor puede
+alterar el estado interno del repositorio por accidente.
 
-### 4.3 Semilla versionada, datos generados no versionados
+### 6.3 El identificador se deriva del nombre
 
-- `GovernmentEntities.seed.txt` (versionado): cuatro columnas extraídas del
-  archivo Excel oficial. Legible y fácil de comparar en un *diff*.
+Es la decisión menos visible del módulo y la que evita un fallo silencioso.
+
+El archivo de datos se genera en el primer arranque a partir del archivo semilla y
+**no se versiona**. Si los identificadores se generaran al azar, cualquier
+regeneración del archivo —borrarlo, clonar el repositorio en otra máquina,
+reconstruir el entorno— produciría identificadores nuevos, y todos los empleados y
+todas las nóminas ya registrados quedarían apuntando a entidades que no existen.
+Nada avisaría: las pantallas simplemente empezarían a mostrar «Entidad no
+disponible».
+
+`DeterministicIdentifierFactory` deriva el identificador del nombre oficial, con
+una comparación insensible a mayúsculas y a espacios sobrantes. El mismo nombre
+produce siempre el mismo identificador, de modo que el archivo se puede borrar y
+regenerar sin perder ninguna asociación. Es la misma idea que un identificador de
+nombre según la RFC 4122; la función hash se usa como función de derivación, no
+como primitiva de seguridad.
+
+Hay pruebas que fijan las dos mitades de la garantía: que el mismo nombre siempre
+da el mismo identificador (`DeterministicIdentifierFactoryTests`) y que borrar y
+regenerar el archivo de datos no cambia ningún identificador
+(`RegenerarElArchivo_ProduceLosMismosIdentificadores`).
+
+### 6.4 Semilla versionada, datos generados no versionados
+
+- `GovernmentEntities.seed.txt` (versionado): cuatro columnas extraídas del archivo
+  Excel oficial. Legible y fácil de comparar en un *diff*.
 - `GovernmentEntities.txt` (no versionado): se genera en el primer arranque con
-  identificadores, estado y auditoría.
+  identificadores, estado y auditoría. Es un archivo **derivado**: regenerarlo
+  produce exactamente el mismo contenido de negocio.
 
-Así el repositorio se clona y ejecuta sin pasos manuales, y los datos capturados
-durante las pruebas de un desarrollador no entran al control de versiones.
+Así el repositorio se clona y ejecuta sin pasos manuales.
 
----
 
 ## 7. Persistencia relacional con Entity Framework Core
 
-### 5.1 Estrategia de herencia: Table Per Hierarchy
+### 7.1 Estrategia de herencia: Table Per Hierarchy
 
 Los cuatro subtipos de empleado se mapean a una única tabla `Employees` con la
 columna discriminadora `EmployeeType`.
@@ -385,7 +428,7 @@ una sola consulta sin uniones. Con Table Per Type serían cuatro `LEFT JOIN` par
 la misma información. El costo de TPH —columnas nulas para los tipos que no las
 usan— es intrascendente en un volumen de miles de empleados.
 
-### 5.2 Consultas: el filtrado ocurre en el motor
+### 7.2 Consultas: el filtrado ocurre en el motor
 
 `EmployeeRepository.SearchAsync` construye el `IQueryable` con los filtros y
 aplica `CountAsync` + `Skip`/`Take` antes de materializar. **Nunca se trae la
@@ -400,13 +443,14 @@ query = query.Where(employee =>
 Las consultas de solo lectura usan `AsNoTracking()`: sin seguimiento de cambios,
 menos memoria y menos trabajo del *change tracker*.
 
-### 5.3 Índices y relaciones
+### 7.3 Índices y relaciones
 
 | Índice | Propósito |
 |---|---|
 | `IX_Employees_SocialSecurityNumber` (único) | Integridad: la unicidad se garantiza en la base de datos, no solo en una validación que una condición de carrera podría burlar. |
 | `IX_Employees_PaternalLastName` | Respalda el filtro por nombre. |
 | `IX_Employees_DepartmentId_Status` | Índice compuesto que respalda el filtro combinado más frecuente. |
+| `IX_Employees_GovernmentEntityId_Status` | Respalda el filtro por entidad y la selección de empleados al calcular la nómina. |
 | `IX_Departments_Code`, `IX_Users_UserName`, `IX_Users_Email`, `IX_Roles_Name` (únicos) | Unicidad de códigos y credenciales. |
 
 Relaciones: `Employee → Department` (muchos a uno, con `DeleteBehavior.Restrict`
@@ -414,14 +458,34 @@ para que no se borre un departamento con empleados) y `User ↔ Role` (muchos a
 muchos mediante la entidad explícita `UserRole`, que además audita la fecha de
 asignación).
 
-### 5.4 Auditoría automática
+**La referencia a la entidad gubernamental no es una clave foránea, y no puede
+serlo.** El listado oficial vive en el archivo de texto plano y una base de datos
+relacional no puede imponer integridad referencial contra un almacén que no
+administra. `Employee.GovernmentEntityId` es una columna indexada sin relación
+declarada, y tampoco existe propiedad de navegación: declararla sugeriría que la
+base de datos garantiza algo que no garantiza.
+
+Las dos consecuencias se atienden de forma explícita:
+
+| Consecuencia | Cómo se atiende |
+|---|---|
+| Nada impediría insertar un empleado con una entidad inexistente | La capa de servicios valida contra el catálogo antes de aceptar el registro (`EnsureGovernmentEntityIsAssignableAsync`), y devuelve HTTP 404 si la entidad no existe o HTTP 400 si está inactiva. Dos pruebas fijan ese comportamiento. |
+| Ninguna consulta puede unir empleados o nóminas con el nombre de su entidad | La capa de servicios resuelve los nombres con **una sola lectura del catálogo por consulta** (`GetNamesByIdentifierAsync`), no una por registro. El documento de nómina, además, guarda el nombre como parte de su instantánea. |
+
+### 7.4 Auditoría automática
 
 `ApplicationDbContext.SaveChangesAsync` recorre el *change tracker* y completa
 `CreatedAt`, `CreatedBy`, `UpdatedAt` y `UpdatedBy` según el estado de cada
 entidad. Centralizarlo ahí hace **imposible** que un servicio se olvide de
 registrar la auditoría.
 
-### 5.5 Fechas siempre en UTC
+Con una excepción deliberada: si la entidad ya trae una fecha de creación
+asignada, se respeta. Es lo que permite que el historial de nómina sembrado quede
+registrado con la fecha en que cada semana se habría pagado, en lugar de con la
+del arranque. Sin esa salvedad, el sellado automático descartaría en silencio la
+fecha que el sembrado calcula con cuidado.
+
+### 7.5 Fechas siempre en UTC
 
 Los proveedores relacionales devuelven `DateTime` con
 `DateTimeKind.Unspecified`. Al serializarlas a JSON quedan sin sufijo de zona y
@@ -446,7 +510,7 @@ entidad futura queda cubierta automáticamente.
 
 ## 8. Seguridad
 
-### 6.1 Autenticación JWT
+### 8.1 Autenticación JWT
 
 El token se firma con HMAC-SHA256 y transporta el identificador del usuario, su
 nombre, su correo y un *claim* de rol por cada rol asignado. Eso permite que la
@@ -461,7 +525,7 @@ entrada no confiable.
 la clave de firma falta o tiene menos de 32 caracteres, la aplicación falla al
 arrancar en lugar de emitir tokens débiles en silencio.
 
-### 6.2 Contraseñas
+### 8.2 Contraseñas
 
 PBKDF2 (`Rfc2898DeriveBytes`) con SHA-256, sal aleatoria de 16 bytes por usuario
 y 100,000 iteraciones. Elegido porque forma parte de la biblioteca base de .NET
@@ -475,7 +539,7 @@ Dos detalles que importan:
 - Un hash o una sal corruptos devuelven `false` en lugar de lanzar una excepción:
   un dato dañado no debe tumbar la autenticación.
 
-### 6.3 Autorización por rol
+### 8.3 Autorización por rol
 
 Tres roles y tres políticas:
 
@@ -490,7 +554,7 @@ endpoint nuevo queda protegido por omisión; abrirlo requiere marcarlo
 explícitamente con `[AllowAnonymous]`. Es la diferencia entre "seguro salvo que
 alguien se acuerde" y "seguro salvo que alguien lo decida".
 
-### 6.4 Otras medidas
+### 8.4 Otras medidas
 
 - **CORS restringido** a los orígenes declarados en configuración, nunca
   `AllowAnyOrigin`.
@@ -509,7 +573,7 @@ alguien se acuerde" y "seguro salvo que alguien lo decida".
 
 ## 9. Validaciones
 
-### 7.1 Validaciones condicionales por tipo
+### 9.1 Validaciones condicionales por tipo
 
 El reto: un único contrato de entrada para cuatro tipos con campos obligatorios
 distintos. FluentValidation lo resuelve con reglas condicionales agrupadas en
@@ -532,14 +596,14 @@ Nueve pruebas fijan este comportamiento, incluida la que verifica que **el prime
 nombre no es obligatorio para el empleado por horas** —lectura fiel de la
 especificación, que solo lo solicita para los otros tres tipos.
 
-### 7.2 Aplicación transversal
+### 9.2 Aplicación transversal
 
 Un `IAsyncActionFilter` (`RequestValidationFilter`) busca en el contenedor un
 `IValidator<T>` para cada argumento de la acción y lo ejecuta. Registrado
 globalmente, **ninguna acción puede olvidarse de validar su entrada**. Los
 controladores quedan sin una sola línea de código de validación.
 
-### 7.3 Las tres barreras
+### 9.3 Las tres barreras
 
 | Barrera | Qué valida | Ejemplo |
 |---|---|---|
@@ -624,25 +688,28 @@ Además del listado de endpoints:
 
 ## 13. Pruebas
 
-77 pruebas unitarias con **xUnit** y **NSubstitute**.
+107 pruebas unitarias con **xUnit** y **NSubstitute**.
 
-### 11.1 Qué se probó y por qué
+### 13.1 Qué se probó y por qué
 
 | Área | Motivo |
 |---|---|
 | Las cuatro fórmulas de nómina | Es la regla más crítica: un error se traduce en dinero mal pagado. |
 | El límite de las 40 horas | Se prueba con 0, 20, 40, 41, 46 y 50 horas. El caso de exactamente 40 es donde un `<` en lugar de un `<=` pasaría desapercibido. |
 | Suma del desglose | Los componentes del reporte deben sumar exactamente el total. Un desglose que no cuadra es peor que no tener desglose. |
+| Que una semana no se pueda pagar dos veces | Es el requisito explícito del enunciado, y el que la interfaz sola no puede garantizar. |
+| Que la vista previa y la generación coincidan | Si difirieran, el usuario aprobaría un cálculo y se guardaría otro. |
 | Escape del archivo plano | Seis casos límite, incluido un valor que contiene la propia secuencia de escape. |
+| Que regenerar el archivo plano no cambie ningún identificador | Es la garantía que sostiene la asociación de empleados y nóminas a entidades. Su fallo sería silencioso. |
 | Rendimiento con 1,000 empleados | Verifica el requisito no funcional de forma automática, no por inspección. |
-| Reglas del servicio | Duplicados, departamento inactivo, cambio de tipo prohibido: se prueban con dobles, sin base de datos. |
+| Reglas del servicio | Duplicados, departamento inactivo, cambio de tipo prohibido y entidad gubernamental inexistente o inactiva: se prueban con dobles, sin base de datos. |
 
-### 11.2 Testabilidad como consecuencia del diseño
+### 13.2 Testabilidad como consecuencia del diseño
 
 Dos abstracciones hacen las pruebas deterministas:
 
 - `IDateTimeProvider` — `FixedDateTimeProvider` devuelve siempre la misma fecha,
-  por lo que se puede afirmar `Assert.Equal(fechaEsperada, report.GeneratedAtUtc)`.
+  por lo que las fechas del cálculo semanal son deterministas y se pueden afirmar.
 - `IFlatFilePathResolver` — el repositorio de texto plano apunta a un directorio
   temporal que cada prueba crea y elimina.
 
@@ -653,28 +720,28 @@ directorio del proyecto: pruebas frágiles y con efectos secundarios.
 
 ## 14. Frontend: React + TypeScript
 
-### 12.1 Decisiones y su justificación
+### 14.1 Decisiones y su justificación
 
 | Decisión | Justificación |
 |---|---|
 | **Vite** en lugar de Create React App | CRA está descontinuado. Vite ofrece arranque instantáneo y recarga en caliente. |
 | **TypeScript estricto** (`strict`, `noUnusedLocals`, `noImplicitReturns`) | Los contratos de la API se declaran una vez en `types/api.ts`; si un campo cambia, el compilador señala cada lugar del cliente que hay que ajustar. |
 | **Sin librería de componentes** (Material UI, Bootstrap) | La maqueta define una identidad visual concreta. Partir de una librería habría significado sobrescribir sus estilos. El CSS propio son 12 KB con la paleta institucional como única fuente. |
-| **Sin librería de iconos** | Nueve iconos SVG en línea que heredan `currentColor`. Cero peso adicional. |
-| **Sin librería de formularios** | Tres formularios con reglas distintas. Estado controlado y validación explícita resultan más legibles que la configuración de una librería. |
+| **Sin librería de iconos** | Iconos SVG en línea que heredan `currentColor`. Cero peso adicional. |
+| **Sin librería de formularios** | Los formularios de la aplicación tienen reglas distintas entre sí. Estado controlado y validación explícita resultan más legibles que la configuración de una librería. |
 | **Sin librería de estado global** (Redux, Zustand) | El único estado global real es la sesión. Un `Context` lo resuelve; Redux sería infraestructura sin problema que resolver. |
 | **Axios con interceptores** | Un interceptor agrega el token a cada petición y otro traduce los errores y avisa cuando la sesión caduca. Ninguna pantalla manipula encabezados de autorización. |
 
 Dependencias de producción: **4** (react, react-dom, react-router-dom, axios).
 
-### 12.2 Fidelidad a la maqueta
+### 14.2 Fidelidad a la maqueta
 
 | Elemento de la maqueta | Implementación |
 |---|---|
 | Azul `rgba(13, 48, 72, .9)` | Variable CSS `--color-blue`, verificada en el navegador |
 | Gris `rgba(237, 240, 247)` | Variable CSS `--color-gray`, fondo del panel de contenido |
 | Barra lateral azul con logotipo | `AppLayout` + `BrandLogo` (SVG en línea) |
-| Menú Inicio / Consulta / Crear registro | Rutas `/inicio`, `/entidades`, `/entidades/nuevo` |
+| Menú Inicio / Consulta | Rutas `/inicio` y `/entidades`. La maqueta muestra además *Crear registro*; esa opción se retiró al quedar el listado oficial como catálogo de solo lectura, y el menú creció con las secciones de Nómina y Seguridad |
 | Icono naranja en el elemento activo | `.sidebar__link--active .sidebar__link-icon` con `--color-accent` |
 | Título de la página en el encabezado | `app-main__title`, con título y subtítulo por ruta |
 | Panel gris con esquinas redondeadas | `.app-panel`, `border-radius: 20px` |
@@ -684,7 +751,7 @@ Se añadieron iconos a todos los elementos del menú (la maqueta solo los muestr
 en el elemento activo), por consistencia visual y para facilitar el
 reconocimiento de cada sección.
 
-### 12.3 La lógica de negocio no se duplica en el cliente
+### 14.3 La lógica de negocio no se duplica en el cliente
 
 El formulario de empleados **no calcula el pago semanal**. Muestra la fórmula
 como texto y el monto que devuelve la API. Duplicar la fórmula en TypeScript
@@ -692,7 +759,7 @@ crearía dos versiones de la misma regla que podrían discrepar tras un cambio
 normativo. Lo mismo aplica a los catálogos de categoría y sector: se derivan de
 los datos realmente almacenados, no de una lista fija en el cliente.
 
-### 12.4 Prácticas de React aplicadas
+### 14.4 Prácticas de React aplicadas
 
 - **Hooks propios**: `useAsyncData` encapsula el patrón cargar/cargando/error y
   descarta el resultado si el componente ya se desmontó.
@@ -731,7 +798,7 @@ los datos realmente almacenados, no de una lista fija en el cliente.
 
 ## 16. Mantenibilidad y escalabilidad
 
-### 14.1 Cómo se agrega un quinto tipo de empleado
+### 16.1 Cómo se agrega un quinto tipo de empleado
 
 Ejercicio concreto de la escalabilidad exigida:
 
@@ -748,7 +815,7 @@ Ejercicio concreto de la escalabilidad exigida:
 **No se modifica** ningún servicio, controlador, repositorio ni componente
 existente. Eso es el Principio Abierto/Cerrado medido en archivos tocados.
 
-### 14.2 Eliminación de números mágicos
+### 16.2 Eliminación de números mágicos
 
 | Constante | Ubicación |
 |---|---|
@@ -762,7 +829,7 @@ existente. Eso es el Principio Abierto/Cerrado medido en archivos tocados.
 Si la normativa laboral cambia el recargo de horas extras, se edita una línea en
 `PayrollConstants`.
 
-### 14.3 Mapeo manual en lugar de AutoMapper
+### 16.3 Mapeo manual en lugar de AutoMapper
 
 Los mapeos entre entidades y DTO se escriben como métodos de extensión
 explícitos. Razones:
@@ -788,22 +855,22 @@ verificable.
 | Arquitectura Onion (4 capas + host) | ✅ | Domain, Application, Services, Infrastructure, Presentation |
 | Autenticación Bearer JWT | ✅ | `JwtTokenGenerator`, `AuthenticationConfiguration` |
 | Base de datos de texto plano en el proyecto | ✅ | `src/SB.API_SB.Presentation/Database/` |
-| Mantenimiento de entidades gubernamentales | ✅ | 181 registros del listado oficial, CRUD completo |
+| **Consulta de entidades gubernamentales** | ✅ | 181 registros del listado oficial, catálogo de solo lectura con filtros, catálogos y detalle |
 | Manejo de logs (Serilog) | ✅ | Consola + archivo de texto + archivo JSON diarios |
 | Documentación (Swagger) | ✅ | `/swagger`, con esquema Bearer |
 | Manejo de excepciones | ✅ | Middleware con `ProblemDetails` |
 | Entrega en repositorio Git | ✅ | Repositorio con `.gitignore` |
 | **Nomenclatura (11 reglas)** | ✅ | Tabla de verificación en el README, sección 11 |
 | Gestión de empleados | ✅ | CRUD completo desde la interfaz |
-| Filtros por nombre, compañía, departamento y estado | ✅ | Resueltos en la base de datos |
+| Filtros por nombre, entidad gubernamental, departamento y estado | ✅ | Resueltos en la base de datos |
 | Gestión de usuarios con roles | ✅ | Tres roles, muchos a muchos, JWT |
 | Cálculo de pago por los cuatro tipos | ✅ | Polimorfismo en el Dominio |
 | Recálculo al actualizar | ✅ | `EmployeeService.UpdateAsync` |
 | Reporte semanal con detalle del cálculo | ✅ | Fórmula y componentes por empleado |
-| **Empleados asociados a una compañía** | ✅ | `Employee.CompanyId`, filtro y columna en la interfaz |
+| **Empleados asociados a una entidad gubernamental del listado** | ✅ | `Employee.GovernmentEntityId`, selector con las 181 entidades, filtro y columna en la interfaz |
 | **Mecanismo de cálculo de pagos semanales** | ✅ | `POST /api/nomina/ejecuciones`, pantalla *Calcular pago semanal* |
 | **Historial de cálculos anteriores** | ✅ | `GET /api/nomina/ejecuciones`, pantalla *Historial de pagos* |
-| **Datos dummy en el historial** | ✅ | `PayrollHistorySeeder`: 24 ejecuciones sembradas |
+| **Datos dummy en el historial** | ✅ | `PayrollHistorySeeder`: 32 ejecuciones sembradas en 4 entidades reales |
 | **No regenerar una semana ya pagada** | ✅ | Tres niveles: interfaz, servicio (HTTP 409) e índice único filtrado |
 | **Tab de logs solo para el administrador** | ✅ | `RegistroEventosController` con política `SoloAdministracion`; verificado 403 con rol Consultor |
 | Backend .NET 8 + EF Core | ✅ | EF Core 8, TPH, índices, relaciones |
@@ -811,7 +878,7 @@ verificable.
 | Base de datos SQL Server u Oracle | ✅ | SQL Server configurado; SQLite para ejecución inmediata |
 | Maqueta y colores institucionales | ✅ | Verificado en el navegador |
 | Validaciones de datos | ✅ | Cuatro barreras |
-| Pruebas unitarias (mínimo 2–3) | ✅ | **98** |
+| Pruebas unitarias (mínimo 2–3) | ✅ | **107** |
 | README con instrucciones | ✅ | Este repositorio |
 | La aplicación loguea todo | ✅ | Peticiones, operaciones, errores, autenticación |
 
@@ -824,22 +891,24 @@ La solución no se entrega solo compilada: se ejecutó de extremo a extremo.
 | Verificación | Resultado |
 |---|---|
 | `dotnet build` de la solución | Sin errores ni advertencias |
-| `dotnet test` | 98/98 pruebas aprobadas |
+| `dotnet test` | 107/107 pruebas aprobadas |
 | `npm run typecheck` y `npm run lint` | Sin errores ni advertencias |
-| `npm run build` | 117 módulos, 294 KB (89 KB comprimido) |
 | Inicio de sesión desde el portal | Token emitido, sesión establecida |
 | Carga del listado oficial | 181 entidades, acentos correctos |
-| Alta de entidad desde la interfaz | Persistida en el archivo plano con el usuario responsable |
 | Nombre con `\|` en el dato | Almacenado como `A\pB`, leído de vuelta como `A\|B` |
-| Nombre duplicado | HTTP 409 con el formato de error esperado |
-| Eliminación de entidad | HTTP 204, registro eliminado, respaldo generado |
+| **Escritura sobre el catálogo de entidades** | `POST`, `PUT` y `DELETE` responden **405**: el catálogo es de solo lectura |
+| **Borrado y regeneración del archivo plano** | Los 181 identificadores resultan idénticos; los 11 empleados siguen mostrando su entidad |
+| Selector de entidades del formulario de empleados | 181 opciones, sin recorte silencioso |
 | Alta de empleado desde la interfaz | Formulario adaptado al tipo; pago calculado correctamente |
+| **Empleado con una entidad inexistente** | **HTTP 404**: es la comprobación que sustituye a la clave foránea |
 | Recálculo al editar horas | 45 h → RD$14,250; 50 h → RD$16,500 |
+| Empleado nuevo en una quinta entidad | Aparece de inmediato en la lista de entidades con nómina |
+| Selector de la pantalla de cálculo | Solo las entidades con empleados, con su cantidad de activos |
 | Generación de nómina desde la interfaz | HTTP 201, documento almacenado con su desglose |
 | **Reintento de la misma semana** | **HTTP 409** con el identificador de la nómina existente |
 | Botón de generar con la semana ya pagada | Deshabilitado, con el motivo en el título |
 | Anulación y regeneración de la semana | HTTP 200 y luego HTTP 201: la semana queda libre |
-| Historial sembrado | 24 ejecuciones, 8 semanas por compañía, montos distintos por semana |
+| Historial sembrado | 32 ejecuciones, 8 semanas por entidad, montos y fechas distintos por semana |
 | Detalle de una nómina histórica | Instantánea con fórmula y componentes de cada empleado |
 | Registro de eventos como administrador | Archivos, conteo por nivel y traza de excepción visibles |
 | Registro de eventos con rol Consultor | **HTTP 403** y la opción no aparece en el menú |
@@ -847,7 +916,7 @@ La solución no se entrega solo compilada: se ejecutó de extremo a extremo.
 | Validación por tipo | HTTP 400 con los errores del campo correspondiente |
 | Colores institucionales en el navegador | `rgba(13, 48, 72, 0.9)` y `rgb(237, 240, 247)` |
 
-**Cuatro defectos encontrados y corregidos durante la verificación:**
+**Cinco defectos encontrados y corregidos durante la verificación:**
 
 1. Las fechas leídas de la base de datos llegaban al cliente sin marca de zona y se
    mostraban con el desfase de la zona horaria local. Se corrigió con un
@@ -861,6 +930,10 @@ La solución no se entrega solo compilada: se ejecutó de extremo a extremo.
 4. Las fechas de periodo sin hora (`2026-08-24`) se mostraban un día antes en el
    portal: `new Date("2026-08-24")` las interpreta como medianoche UTC. Se corrigió
    interpretando las fechas sin hora como fechas locales.
+5. Todo el historial sembrado aparecía generado en el mismo instante: el sellado
+   automático de auditoría sobrescribía sin condición la fecha de creación, y
+   descartaba en silencio la fecha que el sembrado calcula para cada semana. Ahora
+   se respeta la fecha ya asignada (sección 7.4).
 
 ---
 
@@ -871,31 +944,47 @@ archivo de texto plano y SQL Server u Oracle. Se cumplieron ambas exigencias
 asignando a cada almacén el módulo que le corresponde. La arquitectura Onion es
 justamente lo que hace que esa convivencia no genere complejidad accidental.
 
-**2. SQLite como proveedor por omisión en desarrollo.** El requisito pide SQL
+Conviene decir con claridad lo que esa convivencia cuesta, porque es la decisión
+con más consecuencias de la solución: **entre los dos almacenes no puede haber
+integridad referencial**. Un empleado apunta a una entidad gubernamental que vive
+en el archivo de texto plano, y ninguna base de datos relacional puede validar esa
+referencia. Se compensa con una comprobación explícita en la capa de servicios y
+con identificadores derivados del nombre, de modo que regenerar el archivo no
+rompa nada (secciones 6.3 y 7.3). Es un precio asumido a conciencia, no un cabo
+suelto.
+
+**2. La entidad gubernamental como unidad de nómina.** El enunciado pide calcular
+los pagos semanales «de la compañía». En esta solución la unidad que paga es una
+entidad gubernamental del listado oficial, que es el catálogo que la propia prueba
+entrega. Así el sistema trabaja con datos reales de la Administración dominicana en
+lugar de con compañías inventadas, y el listado deja de ser un mantenimiento
+aislado para convertirse en la pieza sobre la que gira la nómina.
+
+**3. SQLite como proveedor por omisión en desarrollo.** El requisito pide SQL
 Server u Oracle. La solución está configurada para SQL Server, pero trae SQLite
 como opción para que el evaluador pueda clonar y ejecutar sin instalar un motor
 de base de datos. Es una línea de configuración; el `DbContext` y los mapeos son
 los mismos.
 
-**3. `EnsureCreated` en lugar de migraciones.** Para una prueba técnica, crear el
+**4. `EnsureCreated` en lugar de migraciones.** Para una prueba técnica, crear el
 esquema al arrancar simplifica la evaluación. En producción el camino correcto
 son las migraciones de EF Core (`dotnet ef migrations add`); el flag
 `Database:ApplyAutomaticInitialization` permite desactivar la creación automática
 cuando se adopten.
 
-**4. El primer nombre es opcional para el empleado por horas.** Lectura fiel de
+**5. El primer nombre es opcional para el empleado por horas.** Lectura fiel de
 la especificación: en la captura del empleado por horas solo se solicitan
 `apellidoPaterno`, `numeroSeguroSocial`, `sueldoPorHora` y `horasTrabajadas`. Se
 implementó tal cual, con una prueba que lo documenta. Si fue una omisión del
 documento, el cambio consiste en quitar una condición del validador.
 
-**5. El logotipo se dibuja como SVG.** El requerimiento indica tomarlo del portal
+**6. El logotipo se dibuja como SVG.** El requerimiento indica tomarlo del portal
 de la Superintendencia. Para que la aplicación no dependa de descargar un recurso
 externo, se dibujó una reproducción en SVG en línea, aislada en un único
 componente (`BrandLogo.tsx`) que se sustituye por el archivo oficial sin tocar
 nada más.
 
-**6. `RollForward` en los proyectos ejecutables.** Los proyectos se compilan
+**7. `RollForward` en los proyectos ejecutables.** Los proyectos se compilan
 contra .NET 8, como exige el requerimiento. `<RollForward>LatestMajor</RollForward>`
 permite además ejecutarlos en máquinas donde solo esté instalado un runtime
 mayor, sin cambiar el `TargetFramework`.

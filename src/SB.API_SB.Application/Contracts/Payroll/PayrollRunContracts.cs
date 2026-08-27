@@ -6,8 +6,8 @@ namespace SB.API_SB.Application.Contracts.Payroll;
 /// <summary>Datos necesarios para generar la nomina de una semana.</summary>
 public sealed class GeneratePayrollRunRequest
 {
-    /// <summary>Compania cuya nomina se va a calcular.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>Entidad gubernamental cuya nomina se va a calcular.</summary>
+    public Guid GovernmentEntityId { get; set; }
 
     /// <summary>Ano ISO 8601 de la semana a pagar.</summary>
     public int Year { get; set; }
@@ -32,8 +32,8 @@ public sealed class CancelPayrollRunRequest
 /// <summary>Filtros del historial de ejecuciones de nomina.</summary>
 public sealed class PayrollRunFilterRequest : PaginationRequest
 {
-    /// <summary>Compania por la que se filtra.</summary>
-    public Guid? CompanyId { get; set; }
+    /// <summary>Entidad gubernamental por la que se filtra.</summary>
+    public Guid? GovernmentEntityId { get; set; }
 
     /// <summary>Ano por el que se filtra.</summary>
     public int? Year { get; set; }
@@ -48,11 +48,11 @@ public sealed class PayrollRunSummaryResponse
     /// <summary>Identificador de la ejecucion.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Identificador de la compania pagada.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>Identificador de la entidad gubernamental pagada.</summary>
+    public Guid GovernmentEntityId { get; set; }
 
-    /// <summary>Razon social de la compania pagada.</summary>
-    public string CompanyName { get; set; } = string.Empty;
+    /// <summary>Razon social de la entidad gubernamental pagada.</summary>
+    public string GovernmentEntityName { get; set; } = string.Empty;
 
     /// <summary>Ano de la semana pagada.</summary>
     public int Year { get; set; }
@@ -155,11 +155,11 @@ public sealed class PayrollRunDetailResponse
 /// </summary>
 public sealed class PayrollPreviewResponse
 {
-    /// <summary>Identificador de la compania.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>Identificador de la entidad gubernamental.</summary>
+    public Guid GovernmentEntityId { get; set; }
 
-    /// <summary>Razon social de la compania.</summary>
-    public string CompanyName { get; set; } = string.Empty;
+    /// <summary>Razon social de la entidad gubernamental.</summary>
+    public string GovernmentEntityName { get; set; } = string.Empty;
 
     /// <summary>Ano de la semana.</summary>
     public int Year { get; set; }
@@ -201,11 +201,35 @@ public sealed class PayrollPreviewResponse
         Array.Empty<PayrollSummaryItemResponse>();
 }
 
-/// <summary>Semanas ya pagadas por una compania en un ano determinado.</summary>
+/// <summary>
+/// Entidad gubernamental con empleados registrados, es decir, con nomina que
+/// calcular.
+/// </summary>
+/// <remarks>
+/// El selector de la pantalla de calculo no muestra las 181 entidades del listado
+/// oficial: muestra las que tienen empleados. Ofrecer una entidad sin empleados
+/// solo conduce a un calculo vacio que la propia API rechaza.
+/// </remarks>
+public sealed class PayableGovernmentEntityResponse
+{
+    /// <summary>Identificador de la entidad gubernamental.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Nombre oficial de la entidad gubernamental.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Empleados registrados, en cualquier estado.</summary>
+    public int TotalEmployeeCount { get; set; }
+
+    /// <summary>Empleados activos, que son los que generan pago.</summary>
+    public int ActiveEmployeeCount { get; set; }
+}
+
+/// <summary>Semanas ya pagadas por una entidad gubernamental en un ano determinado.</summary>
 public sealed class GeneratedWeeksResponse
 {
-    /// <summary>Identificador de la compania consultada.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>Identificador de la entidad gubernamental consultada.</summary>
+    public Guid GovernmentEntityId { get; set; }
 
     /// <summary>Ano consultado.</summary>
     public int Year { get; set; }

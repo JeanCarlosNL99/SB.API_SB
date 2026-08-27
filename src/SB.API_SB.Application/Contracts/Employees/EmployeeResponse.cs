@@ -36,11 +36,11 @@ public sealed class EmployeeResponse
     /// <summary>Descripcion legible del estado laboral.</summary>
     public string StatusDescription { get; set; } = string.Empty;
 
-    /// <summary>Identificador de la compania que emplea a la persona.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>Identificador de la entidad gubernamental que emplea a la persona.</summary>
+    public Guid GovernmentEntityId { get; set; }
 
-    /// <summary>Razon social de la compania.</summary>
-    public string CompanyName { get; set; } = string.Empty;
+    /// <summary>Razon social de la entidad gubernamental.</summary>
+    public string GovernmentEntityName { get; set; } = string.Empty;
 
     /// <summary>Identificador del departamento asignado.</summary>
     public Guid DepartmentId { get; set; }

@@ -46,8 +46,8 @@ public abstract class EmployeeRequestBaseValidator<TRequest> : AbstractValidator
             .Matches("^[0-9A-Za-z-]+$")
             .WithMessage("El numero de seguro social solo admite letras, numeros y guiones.");
 
-        RuleFor(request => request.CompanyId)
-            .NotEqual(Guid.Empty).WithMessage("La compania es obligatoria.");
+        RuleFor(request => request.GovernmentEntityId)
+            .NotEqual(Guid.Empty).WithMessage("La entidad gubernamental es obligatoria.");
 
         RuleFor(request => request.DepartmentId)
             .NotEqual(Guid.Empty).WithMessage("El departamento es obligatorio.");

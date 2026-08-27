@@ -27,16 +27,29 @@ public interface IEmployeeRepository : IRepository<Employee>
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Obtiene los empleados de una compania que deben incluirse en el calculo de
+    /// Obtiene los empleados de una entidad gubernamental que deben incluirse en el calculo de
     /// la nomina semanal.
     /// </summary>
-    /// <param name="companyId">Compania cuya nomina se calcula.</param>
+    /// <param name="governmentEntityId">Entidad gubernamental cuya nomina se calcula.</param>
     /// <param name="onlyActiveEmployees">Indica si se limita a empleados activos.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Empleados con su departamento cargado.</returns>
     Task<IReadOnlyCollection<Employee>> GetForPayrollAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         bool onlyActiveEmployees,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cuenta los empleados agrupados por entidad gubernamental.
+    /// </summary>
+    /// <remarks>
+    /// El agrupamiento se resuelve en el motor de base de datos y devuelve una
+    /// fila por entidad, no la tabla de empleados. Es lo que permite listar las
+    /// entidades con nomina sin traer los empleados a memoria.
+    /// </remarks>
+    /// <param name="cancellationToken">Token de cancelacion.</param>
+    /// <returns>Conteo de empleados por entidad gubernamental.</returns>
+    Task<IReadOnlyCollection<GovernmentEntityEmployeeCount>> CountByGovernmentEntityAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>Determina si el numero de seguro social ya esta registrado.</summary>
@@ -49,3 +62,12 @@ public interface IEmployeeRepository : IRepository<Employee>
         Guid? excludedEmployeeId = null,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>Cantidad de empleados registrados en una entidad gubernamental.</summary>
+/// <param name="GovernmentEntityId">Entidad gubernamental contada.</param>
+/// <param name="TotalEmployeeCount">Empleados registrados, en cualquier estado.</param>
+/// <param name="ActiveEmployeeCount">Empleados activos, que son los que generan pago.</param>
+public sealed record GovernmentEntityEmployeeCount(
+    Guid GovernmentEntityId,
+    int TotalEmployeeCount,
+    int ActiveEmployeeCount);

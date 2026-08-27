@@ -14,11 +14,16 @@ public static class EmployeeMappings
     /// </summary>
     /// <param name="employee">Empleado de dominio.</param>
     /// <param name="typeHandler">Manejador del tipo de empleado.</param>
+    /// <param name="governmentEntityName">
+    /// Nombre de la entidad gubernamental, que el llamador resuelve contra el
+    /// catalogo porque no es una propiedad de navegacion.
+    /// </param>
     /// <param name="includePaymentBreakdown">Indica si se incluye el desglose del calculo.</param>
     /// <returns>Respuesta lista para devolverse desde la API.</returns>
     public static EmployeeResponse ToResponse(
         this Employee employee,
         IEmployeeTypeHandler typeHandler,
+        string governmentEntityName,
         bool includePaymentBreakdown = true)
     {
         ArgumentNullException.ThrowIfNull(employee);
@@ -35,8 +40,8 @@ public static class EmployeeMappings
             TypeDescription = typeHandler.TypeDescription,
             Status = employee.Status,
             StatusDescription = employee.Status.Describe(),
-            CompanyId = employee.CompanyId,
-            CompanyName = employee.Company?.Name ?? string.Empty,
+            GovernmentEntityId = employee.GovernmentEntityId,
+            GovernmentEntityName = governmentEntityName,
             DepartmentId = employee.DepartmentId,
             DepartmentName = employee.Department?.Name ?? string.Empty,
             WeeklyPayment = employee.CalculateWeeklyPayment(),
@@ -65,7 +70,7 @@ public static class EmployeeMappings
         employee.FirstName = request.FirstName?.Trim();
         employee.PaternalLastName = request.PaternalLastName.Trim();
         employee.SocialSecurityNumber = request.SocialSecurityNumber.Trim();
-        employee.CompanyId = request.CompanyId;
+        employee.GovernmentEntityId = request.GovernmentEntityId;
         employee.DepartmentId = request.DepartmentId;
         employee.Status = request.Status;
     }

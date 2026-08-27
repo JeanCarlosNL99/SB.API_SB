@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import { employeesApi, governmentEntitiesApi } from '@/api/endpoints';
-import { companiesApi, payrollApi } from '@/api/payrollEndpoints';
+import { payrollApi } from '@/api/payrollEndpoints';
 import { ErrorMessage, LoadingIndicator } from '@/components/Feedback';
 import {
-  CompanyIcon,
   HistoryIcon,
   InstitutionIcon,
   PayrollIcon,
@@ -19,9 +18,8 @@ import type { PayrollRunSummary } from '@/types/api';
 interface HomeSummary {
   governmentEntityCount: number;
   employeeCount: number;
-  companyCount: number;
-  activeCompanyCount: number;
-  pendingCompanyCount: number;
+  payableEntityCount: number;
+  pendingEntityCount: number;
   lastPayrollRuns: PayrollRunSummary[];
 }
 
@@ -29,7 +27,7 @@ interface HomeSummary {
  * Pantalla de inicio.
  *
  * Consolida los indicadores de los modulos en una sola vista y responde la
- * pregunta operativa del negocio: cuantas companias tienen pendiente el pago de
+ * pregunta operativa del negocio: cuantas entidades tienen pendiente el pago de
  * la semana pasada. Las consultas se lanzan en paralelo porque son independientes
  * entre si.
  */
@@ -37,10 +35,10 @@ export function HomePage() {
   const previousWeek = getPreviousWeek(getCurrentWeek());
 
   const { data, isLoading, error } = useAsyncData<HomeSummary>(async () => {
-    const [entitiesPage, employeesPage, companies, historyPage] = await Promise.all([
+    const [entitiesPage, employeesPage, payableEntities, historyPage] = await Promise.all([
       governmentEntitiesApi.search({ pageNumber: 1, pageSize: 1 }),
       employeesApi.search({ pageNumber: 1, pageSize: 1 }),
-      companiesApi.getAll(),
+      payrollApi.getPayableEntities(),
       payrollApi.searchHistory({
         year: previousWeek.year,
         includeCancelled: false,
@@ -49,21 +47,22 @@ export function HomePage() {
       }),
     ]);
 
-    const activeCompanies = companies.filter((company) => company.isActive);
+    const entitiesWithActiveEmployees = payableEntities.filter(
+      (entity) => entity.activeEmployeeCount > 0,
+    );
 
-    const companiesPaidForPreviousWeek = new Set(
+    const entitiesPaidForPreviousWeek = new Set(
       historyPage.items
         .filter((summary) => summary.weekNumber === previousWeek.weekNumber)
-        .map((summary) => summary.companyId),
+        .map((summary) => summary.governmentEntityId),
     );
 
     return {
       governmentEntityCount: entitiesPage.totalCount,
       employeeCount: employeesPage.totalCount,
-      companyCount: companies.length,
-      activeCompanyCount: activeCompanies.length,
-      pendingCompanyCount: activeCompanies.filter(
-        (company) => !companiesPaidForPreviousWeek.has(company.id),
+      payableEntityCount: entitiesWithActiveEmployees.length,
+      pendingEntityCount: entitiesWithActiveEmployees.filter(
+        (entity) => !entitiesPaidForPreviousWeek.has(entity.id),
       ).length,
       lastPayrollRuns: historyPage.items.slice(0, 5),
     };
@@ -85,9 +84,9 @@ export function HomePage() {
     <>
       <section className="metric-grid">
         <MetricCard
-          icon={<CompanyIcon size={22} />}
-          label="Companias activas"
-          value={`${data.activeCompanyCount} de ${data.companyCount}`}
+          icon={<InstitutionIcon size={22} />}
+          label="Entidades con nomina"
+          value={data.payableEntityCount.toLocaleString('es-DO')}
         />
         <MetricCard
           icon={<PeopleIcon size={22} />}
@@ -97,7 +96,7 @@ export function HomePage() {
         <MetricCard
           icon={<PayrollIcon size={22} />}
           label={`Pendientes de pagar ${toLabel(previousWeek)}`}
-          value={data.pendingCompanyCount.toLocaleString('es-DO')}
+          value={data.pendingEntityCount.toLocaleString('es-DO')}
         />
         <MetricCard
           icon={<InstitutionIcon size={22} />}
@@ -106,12 +105,12 @@ export function HomePage() {
         />
       </section>
 
-      {data.pendingCompanyCount > 0 && (
+      {data.pendingEntityCount > 0 && (
         <section className="card">
           <div className="alert alert--info" role="status">
             <div>
               <strong>
-                {data.pendingCompanyCount} compania(s) sin la nomina de la semana{' '}
+                {data.pendingEntityCount} entidad(es) sin la nomina de la semana{' '}
                 {toLabel(previousWeek)}.
               </strong>
               <p style={{ marginTop: 4 }}>
@@ -147,7 +146,7 @@ export function HomePage() {
               <thead>
                 <tr>
                   <th>Semana</th>
-                  <th>Compania</th>
+                  <th>Entidad gubernamental</th>
                   <th className="table th--numeric">Empleados</th>
                   <th className="table th--numeric">Total pagado</th>
                   <th>Generada</th>
@@ -164,7 +163,7 @@ export function HomePage() {
                         {formatDate(summary.weekEndDate)}
                       </span>
                     </td>
-                    <td className="table td--wrap">{summary.companyName}</td>
+                    <td className="table td--wrap">{summary.governmentEntityName}</td>
                     <td className="table td--numeric">{summary.employeeCount}</td>
                     <td className="table td--numeric">
                       {formatCurrency(summary.totalAmount)}
@@ -193,7 +192,7 @@ export function HomePage() {
             to="/nomina"
             icon={<PayrollIcon size={22} />}
             title="Calcular pago semanal"
-            description="Revise el calculo de una semana y genere el pago de la compania."
+            description="Revise el calculo de una semana y genere el pago de la entidad."
           />
           <QuickLink
             to="/nomina/historial"
@@ -205,7 +204,7 @@ export function HomePage() {
             to="/empleados"
             icon={<PeopleIcon size={22} />}
             title="Gestionar empleados"
-            description="Alta, edicion y filtros por nombre, compania, departamento y estado."
+            description="Alta, edicion y filtros por nombre, entidad, departamento y estado."
           />
           <QuickLink
             to="/entidades"

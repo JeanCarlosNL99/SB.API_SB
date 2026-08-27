@@ -21,7 +21,7 @@ public interface IPayrollRunRepository : IRepository<PayrollRun>
 
     /// <summary>
     /// Obtiene una ejecucion con su detalle completo: lineas, componentes del
-    /// calculo y compania.
+    /// calculo y entidad gubernamental.
     /// </summary>
     /// <param name="payrollRunId">Identificador de la ejecucion.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
@@ -31,28 +31,28 @@ public interface IPayrollRunRepository : IRepository<PayrollRun>
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Determina si la compania ya tiene una ejecucion vigente para la semana
+    /// Determina si la entidad gubernamental ya tiene una ejecucion vigente para la semana
     /// indicada. Es la comprobacion que impide pagar dos veces la misma semana.
     /// </summary>
-    /// <param name="companyId">Identificador de la compania.</param>
+    /// <param name="governmentEntityId">Identificador de la entidad gubernamental.</param>
     /// <param name="payrollWeek">Semana a verificar.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>La ejecucion existente, o nulo si la semana esta libre.</returns>
     Task<PayrollRun?> FindGeneratedRunAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         PayrollWeek payrollWeek,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Obtiene los numeros de semana ya pagados por una compania en un ano, para
+    /// Obtiene los numeros de semana ya pagados por una entidad gubernamental en un ano, para
     /// que la interfaz pueda mostrarlos sin recorrer el historial completo.
     /// </summary>
-    /// <param name="companyId">Identificador de la compania.</param>
+    /// <param name="governmentEntityId">Identificador de la entidad gubernamental.</param>
     /// <param name="year">Ano consultado.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Numeros de semana con ejecucion vigente.</returns>
     Task<IReadOnlyCollection<int>> GetGeneratedWeekNumbersAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         int year,
         CancellationToken cancellationToken = default);
 }

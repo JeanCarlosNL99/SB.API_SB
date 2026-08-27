@@ -8,15 +8,16 @@ namespace SB.API_SB.Infrastructure.Persistence.Configurations;
 /// Mapeo de la ejecucion de nomina.
 /// </summary>
 /// <remarks>
-/// El indice unico filtrado sobre (CompanyId, Year, WeekNumber) es la pieza clave:
-/// hace que la base de datos rechace una segunda nomina vigente para la misma
-/// semana. La comprobacion en el servicio da un mensaje claro al usuario, pero es
-/// este indice el que cierra la ventana de una condicion de carrera entre dos
-/// peticiones simultaneas.
+/// El indice unico filtrado sobre (GovernmentEntityId, Year, WeekNumber) es la
+/// pieza clave: hace que la base de datos rechace una segunda nomina vigente para
+/// la misma semana. La comprobacion en el servicio da un mensaje claro al
+/// usuario, pero es este indice el que cierra la ventana de una condicion de
+/// carrera entre dos peticiones simultaneas.
 /// </remarks>
 public sealed class PayrollRunConfiguration : IEntityTypeConfiguration<PayrollRun>
 {
     private const int CANCELLATION_REASON_MAXIMUM_LENGTH = 500;
+    private const int GOVERNMENT_ENTITY_NAME_MAXIMUM_LENGTH = 250;
 
     /// <inheritdoc />
     public void Configure(EntityTypeBuilder<PayrollRun> builder)
@@ -49,16 +50,20 @@ public sealed class PayrollRunConfiguration : IEntityTypeConfiguration<PayrollRu
         builder.Property(payrollRun => payrollRun.UpdatedBy)
             .HasMaxLength(ColumnDefinitions.AUDIT_USER_MAXIMUM_LENGTH);
 
-        builder.HasOne(payrollRun => payrollRun.Company)
-            .WithMany(company => company.PayrollRuns)
-            .HasForeignKey(payrollRun => payrollRun.CompanyId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // El nombre de la entidad gubernamental se almacena en el documento porque
+        // el listado oficial vive en el archivo de texto plano: no hay clave
+        // foranea posible hacia el, y por tanto ninguna consulta que lo una con el
+        // historial. Guardar el nombre es lo que hace la nomina legible por si
+        // sola, tal como ya ocurre con los datos del empleado en cada linea.
+        builder.Property(payrollRun => payrollRun.GovernmentEntityName)
+            .IsRequired()
+            .HasMaxLength(GOVERNMENT_ENTITY_NAME_MAXIMUM_LENGTH);
 
         // Una semana solo puede tener una nomina vigente. El filtro deja fuera las
         // anuladas, de modo que anular libera la semana para recalcularla.
         builder.HasIndex(payrollRun => new
             {
-                payrollRun.CompanyId,
+                payrollRun.GovernmentEntityId,
                 payrollRun.Year,
                 payrollRun.WeekNumber
             })
@@ -66,12 +71,12 @@ public sealed class PayrollRunConfiguration : IEntityTypeConfiguration<PayrollRu
             // Se usan comillas dobles como delimitador de identificador porque las
             // admiten tanto SQLite como SQL Server, manteniendo el indice portable.
             .HasFilter("\"Status\" = 1")
-            .HasDatabaseName("IX_PayrollRuns_Company_Year_Week_Vigente");
+            .HasDatabaseName("IX_PayrollRuns_Entidad_Ano_Semana_Vigente");
 
         // Indice que respalda el listado del historial, ordenado por periodo.
         builder.HasIndex(payrollRun => new
             {
-                payrollRun.CompanyId,
+                payrollRun.GovernmentEntityId,
                 payrollRun.Year,
                 payrollRun.WeekNumber,
                 payrollRun.Status

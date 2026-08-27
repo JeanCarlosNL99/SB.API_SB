@@ -6,8 +6,6 @@ namespace SB.API_SB.Application.Mappings;
 /// <summary>Proyecciones del historial de nomina hacia sus contratos publicos.</summary>
 public static class PayrollRunMappings
 {
-    private const string UNKNOWN_COMPANY_NAME = "Compania no disponible";
-
     /// <summary>Convierte la cabecera de una ejecucion en su respuesta de API.</summary>
     /// <param name="payrollRun">Ejecucion de nomina.</param>
     /// <returns>Cabecera lista para devolverse.</returns>
@@ -18,8 +16,8 @@ public static class PayrollRunMappings
         return new PayrollRunSummaryResponse
         {
             Id = payrollRun.Id,
-            CompanyId = payrollRun.CompanyId,
-            CompanyName = payrollRun.Company?.Name ?? UNKNOWN_COMPANY_NAME,
+            GovernmentEntityId = payrollRun.GovernmentEntityId,
+            GovernmentEntityName = payrollRun.GovernmentEntityName,
             Year = payrollRun.Year,
             WeekNumber = payrollRun.WeekNumber,
             WeekLabel = payrollRun.GetPayrollWeek().Label,

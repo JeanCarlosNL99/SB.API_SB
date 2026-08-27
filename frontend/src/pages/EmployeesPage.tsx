@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
-import { departmentsApi, employeesApi } from '@/api/endpoints';
-import { companiesApi } from '@/api/payrollEndpoints';
+import { departmentsApi, employeesApi, governmentEntitiesApi } from '@/api/endpoints';
 import { EmployeeForm } from '@/components/EmployeeForm';
 import { EMPLOYEE_TYPE_DEFINITIONS } from '@/constants/employeeTypes';
 import {
@@ -28,7 +27,7 @@ import type {
 
 const INITIAL_FILTER: EmployeeFilter = {
   name: '',
-  companyId: '',
+  governmentEntityId: '',
   departmentId: '',
   status: '',
   type: '',
@@ -54,7 +53,10 @@ export function EmployeesPage() {
   const [operationError, setOperationError] = useState<unknown>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const companiesQuery = useAsyncData(() => companiesApi.getAll(), []);
+  const governmentEntitiesQuery = useAsyncData(
+    () => governmentEntitiesApi.getOptions(),
+    [],
+  );
   const departmentsQuery = useAsyncData(() => departmentsApi.getAll(), []);
 
   // El campo de texto responde de inmediato en pantalla, pero la consulta se
@@ -65,7 +67,7 @@ export function EmployeesPage() {
     () => employeesApi.search({ ...filter, name: debouncedName }),
     [
       debouncedName,
-      filter.companyId,
+      filter.governmentEntityId,
       filter.departmentId,
       filter.status,
       filter.type,
@@ -89,7 +91,7 @@ export function EmployeesPage() {
 
   const hasActiveFilters =
     (filter.name ?? '') !== '' ||
-    (filter.companyId ?? '') !== '' ||
+    (filter.governmentEntityId ?? '') !== '' ||
     (filter.departmentId ?? '') !== '' ||
     (filter.status ?? '') !== '' ||
     (filter.type ?? '') !== '';
@@ -262,21 +264,21 @@ export function EmployeesPage() {
           </div>
 
           <div className="field">
-            <label className="field__label" htmlFor="employeeCompany">
-              Compania
+            <label className="field__label" htmlFor="employeeGovernmentEntity">
+              Entidad gubernamental
             </label>
             <select
-              id="employeeCompany"
+              id="employeeGovernmentEntity"
               className="control"
-              value={filter.companyId ?? ''}
+              value={filter.governmentEntityId ?? ''}
               onChange={(changeEvent) =>
-                updateFilter({ companyId: changeEvent.target.value })
+                updateFilter({ governmentEntityId: changeEvent.target.value })
               }
             >
               <option value="">Todas</option>
-              {(companiesQuery.data ?? []).map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
+              {(governmentEntitiesQuery.data ?? []).map((governmentEntity) => (
+                <option key={governmentEntity.id} value={governmentEntity.id}>
+                  {governmentEntity.name}
                 </option>
               ))}
             </select>
@@ -387,7 +389,7 @@ export function EmployeesPage() {
                       <th>Empleado</th>
                       <th>Seguro social</th>
                       <th>Tipo de contrato</th>
-                      <th>Compania</th>
+                      <th>Entidad gubernamental</th>
                       <th>Departamento</th>
                       <th>Estado</th>
                       <th className="table th--numeric">Pago semanal</th>
@@ -412,7 +414,7 @@ export function EmployeesPage() {
                             {employee.typeDescription}
                           </span>
                         </td>
-                        <td className="table td--wrap">{employee.companyName}</td>
+                        <td className="table td--wrap">{employee.governmentEntityName}</td>
                         <td>{employee.departmentName}</td>
                         <td>
                           <span
@@ -488,7 +490,7 @@ export function EmployeesPage() {
         onClose={() => setIsCreating(false)}
       >
         <EmployeeForm
-          companies={companiesQuery.data ?? []}
+          governmentEntities={governmentEntitiesQuery.data ?? []}
           departments={departmentsQuery.data ?? []}
           isSubmitting={isProcessing}
           submitError={operationError}
@@ -506,7 +508,7 @@ export function EmployeesPage() {
         {employeeBeingEdited && (
           <EmployeeForm
             employee={employeeBeingEdited}
-            companies={companiesQuery.data ?? []}
+            governmentEntities={governmentEntitiesQuery.data ?? []}
           departments={departmentsQuery.data ?? []}
             isSubmitting={isProcessing}
             submitError={operationError}
@@ -553,8 +555,8 @@ function EmployeeDetail({ employee }: { employee: Employee }) {
         <span className="detail-row__value">{employee.typeDescription}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Compania</span>
-        <span className="detail-row__value">{employee.companyName}</span>
+        <span className="detail-row__label">Entidad gubernamental</span>
+        <span className="detail-row__value">{employee.governmentEntityName}</span>
       </div>
       <div className="detail-row">
         <span className="detail-row__label">Departamento</span>

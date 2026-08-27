@@ -60,17 +60,16 @@ export interface GovernmentEntity {
   updatedAt?: string | null;
 }
 
-/** Datos para crear una entidad gubernamental. */
-export interface CreateGovernmentEntityRequest {
+/**
+ * Entidad gubernamental reducida a lo que necesita un selector.
+ *
+ * La consulta paginada no sirve para llenar un selector: recortaria el listado en
+ * silencio al superar el tamano maximo de pagina. La API expone un endpoint
+ * propio que devuelve el listado completo con solo estos dos campos.
+ */
+export interface GovernmentEntityOption {
+  id: string;
   name: string;
-  category: string;
-  stateBranch: string;
-  sector: string;
-}
-
-/** Datos para actualizar una entidad gubernamental. */
-export interface UpdateGovernmentEntityRequest extends CreateGovernmentEntityRequest {
-  status: RecordStatus;
 }
 
 /** Filtros de la consulta de entidades gubernamentales. */
@@ -125,8 +124,8 @@ export interface Employee {
   typeDescription: string;
   status: EmployeeStatus;
   statusDescription: string;
-  companyId: string;
-  companyName: string;
+  governmentEntityId: string;
+  governmentEntityName: string;
   departmentId: string;
   departmentName: string;
   weeklySalary?: number | null;
@@ -147,7 +146,7 @@ export interface EmployeeRequest {
   firstName?: string | null;
   paternalLastName: string;
   socialSecurityNumber: string;
-  companyId: string;
+  governmentEntityId: string;
   departmentId: string;
   status: EmployeeStatus;
   weeklySalary?: number | null;
@@ -161,7 +160,7 @@ export interface EmployeeRequest {
 /** Filtros de la consulta de empleados. */
 export interface EmployeeFilter {
   name?: string;
-  companyId?: string;
+  governmentEntityId?: string;
   departmentId?: string;
   status?: EmployeeStatus | '';
   type?: EmployeeType | '';
@@ -223,36 +222,15 @@ export interface ProblemDetails {
 }
 
 /* ------------------------------------------------------------------ */
-/* Companias y calculo de pagos semanales                              */
+/* Calculo de pagos semanales por entidad gubernamental                */
 /* ------------------------------------------------------------------ */
 
 /** Estado de una ejecucion de nomina. */
 export type PayrollRunStatus = 'Generated' | 'Cancelled';
 
-/** Compania para la que se calcula la nomina. */
-export interface Company {
-  id: string;
-  name: string;
-  taxIdentificationNumber: string;
-  isActive: boolean;
-  activeEmployeeCount: number;
-  createdAt: string;
-}
-
-/** Datos para crear una compania. */
-export interface CreateCompanyRequest {
-  name: string;
-  taxIdentificationNumber: string;
-}
-
-/** Datos para actualizar una compania. */
-export interface UpdateCompanyRequest extends CreateCompanyRequest {
-  isActive: boolean;
-}
-
 /** Datos para generar la nomina de una semana. */
 export interface GeneratePayrollRunRequest {
-  companyId: string;
+  governmentEntityId: string;
   year: number;
   weekNumber: number;
   onlyActiveEmployees: boolean;
@@ -265,7 +243,7 @@ export interface CancelPayrollRunRequest {
 
 /** Filtros del historial de nomina. */
 export interface PayrollRunFilter {
-  companyId?: string;
+  governmentEntityId?: string;
   year?: number | '';
   includeCancelled: boolean;
   pageNumber: number;
@@ -275,8 +253,8 @@ export interface PayrollRunFilter {
 /** Cabecera de una ejecucion de nomina. */
 export interface PayrollRunSummary {
   id: string;
-  companyId: string;
-  companyName: string;
+  governmentEntityId: string;
+  governmentEntityName: string;
   year: number;
   weekNumber: number;
   weekLabel: string;
@@ -316,8 +294,8 @@ export interface PayrollRunDetail {
 
 /** Vista previa del calculo de una semana antes de generarla. */
 export interface PayrollPreview {
-  companyId: string;
-  companyName: string;
+  governmentEntityId: string;
+  governmentEntityName: string;
   year: number;
   weekNumber: number;
   weekLabel: string;
@@ -332,9 +310,22 @@ export interface PayrollPreview {
   totalsByDepartment: PayrollSummaryItem[];
 }
 
-/** Semanas ya pagadas por una compania en un ano. */
+/**
+ * Entidad gubernamental con empleados registrados, es decir, con nomina que
+ * calcular. El selector de la pantalla de calculo muestra estas y no las 181 del
+ * listado oficial: ofrecer una entidad sin empleados solo conduce a un calculo
+ * vacio que la API rechaza.
+ */
+export interface PayableGovernmentEntity {
+  id: string;
+  name: string;
+  totalEmployeeCount: number;
+  activeEmployeeCount: number;
+}
+
+/** Semanas ya pagadas por una entidad gubernamental en un ano. */
 export interface GeneratedWeeks {
-  companyId: string;
+  governmentEntityId: string;
   year: number;
   weeksInYear: number;
   generatedWeekNumbers: number[];

@@ -33,9 +33,6 @@ public sealed class ApplicationDbContext : DbContext, IUnitOfWork
     /// <summary>Empleados, incluidos todos sus subtipos.</summary>
     public DbSet<Employee> Employees => Set<Employee>();
 
-    /// <summary>Companias para las que se calcula la nomina.</summary>
-    public DbSet<Company> Companies => Set<Company>();
-
     /// <summary>Ejecuciones de nomina generadas.</summary>
     public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
 
@@ -125,7 +122,15 @@ public sealed class ApplicationDbContext : DbContext, IUnitOfWork
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.CreatedAt = currentDateTime;
+                // Se respeta la fecha que la entidad ya trae asignada. La siembra del
+                // historial de nomina fija la fecha en que cada ejecucion se habria
+                // generado; sobrescribirla haria que ocho semanas de historico
+                // aparecieran creadas en el mismo instante.
+                if (entry.Entity.CreatedAt == default)
+                {
+                    entry.Entity.CreatedAt = currentDateTime;
+                }
+
                 entry.Entity.CreatedBy = string.IsNullOrWhiteSpace(entry.Entity.CreatedBy)
                     ? userName
                     : entry.Entity.CreatedBy;

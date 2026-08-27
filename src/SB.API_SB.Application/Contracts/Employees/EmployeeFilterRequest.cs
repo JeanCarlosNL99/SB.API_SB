@@ -12,8 +12,8 @@ public sealed class EmployeeFilterRequest : PaginationRequest
     /// <summary>Texto a buscar en el nombre o apellido del empleado.</summary>
     public string? Name { get; set; }
 
-    /// <summary>Compania por la que se filtra.</summary>
-    public Guid? CompanyId { get; set; }
+    /// <summary>Entidad gubernamental por la que se filtra.</summary>
+    public Guid? GovernmentEntityId { get; set; }
 
     /// <summary>Departamento por el que se filtra.</summary>
     public Guid? DepartmentId { get; set; }

@@ -3,8 +3,8 @@ namespace SB.API_SB.Domain.Interfaces.Criteria;
 /// <summary>Criterios de busqueda del historial de ejecuciones de nomina.</summary>
 public sealed class PayrollRunFilterCriteria
 {
-    /// <summary>Compania por la que se desea filtrar.</summary>
-    public Guid? CompanyId { get; init; }
+    /// <summary>Entidad gubernamental por la que se desea filtrar.</summary>
+    public Guid? GovernmentEntityId { get; init; }
 
     /// <summary>Ano por el que se desea filtrar.</summary>
     public int? Year { get; init; }

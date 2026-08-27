@@ -28,6 +28,20 @@ public static class GovernmentEntityMappings
         };
     }
 
+    /// <summary>Reduce la entidad a las dos propiedades que usa un selector.</summary>
+    /// <param name="entity">Entidad gubernamental.</param>
+    /// <returns>Opcion lista para alimentar un selector de la interfaz.</returns>
+    public static GovernmentEntityOptionResponse ToOptionResponse(this GovernmentEntity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+
+        return new GovernmentEntityOptionResponse
+        {
+            Id = entity.Id,
+            Name = entity.Name
+        };
+    }
+
     /// <summary>Convierte los catalogos de dominio en su respuesta de API.</summary>
     /// <param name="catalogs">Catalogos obtenidos del repositorio.</param>
     /// <returns>Catalogos listos para alimentar los filtros de la interfaz.</returns>

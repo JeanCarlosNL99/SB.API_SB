@@ -1,69 +1,51 @@
 import { buildQueryParameters, httpClient } from './httpClient';
 import type {
   CancelPayrollRunRequest,
-  Company,
-  CreateCompanyRequest,
   EventLogFile,
   EventLogFilter,
   EventLogResult,
   GeneratePayrollRunRequest,
   GeneratedWeeks,
   PagedResponse,
+  PayableGovernmentEntity,
   PayrollPreview,
   PayrollRunDetail,
   PayrollRunFilter,
   PayrollRunSummary,
-  UpdateCompanyRequest,
 } from '@/types/api';
 
 /**
- * Acceso a la API de companias, calculo de pagos semanales y registro de
- * eventos. Se separa del modulo de endpoints original para que cada archivo
- * agrupe un conjunto coherente de recursos.
+ * Acceso a la API de calculo de pagos semanales y registro de eventos. Se separa
+ * del modulo de endpoints original para que cada archivo agrupe un conjunto
+ * coherente de recursos.
  */
 
-export const companiesApi = {
-  /** Obtiene todas las companias con su cantidad de empleados activos. */
-  async getAll(): Promise<Company[]> {
-    const { data } = await httpClient.get<Company[]>('/companias');
-
-    return data;
-  },
-
-  /** Registra una nueva compania. */
-  async create(request: CreateCompanyRequest): Promise<Company> {
-    const { data } = await httpClient.post<Company>('/companias', request);
-
-    return data;
-  },
-
-  /** Actualiza una compania existente. */
-  async update(companyId: string, request: UpdateCompanyRequest): Promise<Company> {
-    const { data } = await httpClient.put<Company>(`/companias/${companyId}`, request);
-
-    return data;
-  },
-
-  /** Elimina una compania sin empleados ni nominas. */
-  async remove(companyId: string): Promise<void> {
-    await httpClient.delete(`/companias/${companyId}`);
-  },
-};
-
 export const payrollApi = {
+  /**
+   * Obtiene las entidades gubernamentales que tienen empleados y por tanto
+   * nomina que calcular.
+   */
+  async getPayableEntities(): Promise<PayableGovernmentEntity[]> {
+    const { data } = await httpClient.get<PayableGovernmentEntity[]>(
+      '/nomina/entidades',
+    );
+
+    return data;
+  },
+
   /**
    * Calcula la nomina de una semana sin almacenarla. Informa si la semana ya
    * fue pagada, de modo que la pantalla pueda impedir la generacion antes de
    * intentarla.
    */
   async getPreview(
-    companyId: string,
+    governmentEntityId: string,
     year: number,
     weekNumber: number,
     onlyActiveEmployees: boolean,
   ): Promise<PayrollPreview> {
     const { data } = await httpClient.get<PayrollPreview>('/nomina/vista-previa', {
-      params: { companyId, year, weekNumber, onlyActiveEmployees },
+      params: { governmentEntityId, year, weekNumber, onlyActiveEmployees },
     });
 
     return data;
@@ -109,9 +91,9 @@ export const payrollApi = {
   },
 
   /** Obtiene las semanas de un ano que ya tienen nomina generada. */
-  async getGeneratedWeeks(companyId: string, year: number): Promise<GeneratedWeeks> {
+  async getGeneratedWeeks(governmentEntityId: string, year: number): Promise<GeneratedWeeks> {
     const { data } = await httpClient.get<GeneratedWeeks>('/nomina/semanas-generadas', {
-      params: { companyId, year },
+      params: { governmentEntityId, year },
     });
 
     return data;

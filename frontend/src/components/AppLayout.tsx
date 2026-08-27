@@ -2,7 +2,6 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuthentication } from '@/hooks/useAuthentication';
 import { BrandLogo } from './BrandLogo';
 import {
-  CompanyIcon,
   EventLogIcon,
   HistoryIcon,
   HomeIcon,
@@ -10,7 +9,6 @@ import {
   LogoutIcon,
   PayrollIcon,
   PeopleIcon,
-  PlusIcon,
   SearchIcon,
   ShieldIcon,
 } from './Icons';
@@ -21,7 +19,6 @@ interface NavigationItem {
   label: string;
   icon: JSX.Element;
   requiresAdministrator?: boolean;
-  requiresWritePermission?: boolean;
 }
 
 /** Grupo de elementos del menu lateral. */
@@ -42,20 +39,11 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   },
   {
     label: 'Entidades gubernamentales',
-    items: [
-      { to: '/entidades', label: 'Consulta', icon: <SearchIcon /> },
-      {
-        to: '/entidades/nuevo',
-        label: 'Crear registro',
-        icon: <PlusIcon />,
-        requiresWritePermission: true,
-      },
-    ],
+    items: [{ to: '/entidades', label: 'Consulta', icon: <SearchIcon /> }],
   },
   {
     label: 'Nomina',
     items: [
-      { to: '/companias', label: 'Companias', icon: <CompanyIcon /> },
       { to: '/empleados', label: 'Empleados', icon: <PeopleIcon /> },
       { to: '/nomina', label: 'Calcular pago semanal', icon: <PayrollIcon /> },
       { to: '/nomina/historial', label: 'Historial de pagos', icon: <HistoryIcon /> },
@@ -90,21 +78,13 @@ const PAGE_HEADERS: Record<string, { title: string; subtitle: string }> = {
     title: 'Entidades gubernamentales',
     subtitle: 'Consulta del listado oficial de la Republica Dominicana',
   },
-  '/entidades/nuevo': {
-    title: 'Crear registro',
-    subtitle: 'Alta de una entidad gubernamental',
-  },
   '/empleados': {
     title: 'Empleados',
     subtitle: 'Gestion de empleados y calculo de pago semanal',
   },
-  '/companias': {
-    title: 'Companias',
-    subtitle: 'Registro de las companias cuya nomina se calcula',
-  },
   '/nomina': {
     title: 'Calculo de pago semanal',
-    subtitle: 'Genere la nomina de una semana por compania',
+    subtitle: 'Genere la nomina de una semana por entidad gubernamental',
   },
   '/nomina/historial': {
     title: 'Historial de pagos semanales',
@@ -126,7 +106,7 @@ const PAGE_HEADERS: Record<string, { title: string; subtitle: string }> = {
  * contenido, siguiendo la maqueta entregada.
  */
 export function AppLayout() {
-  const { session, logout, isAdministrator, canWriteMaintenance } = useAuthentication();
+  const { session, logout, isAdministrator } = useAuthentication();
   const location = useLocation();
 
   const pageHeader = PAGE_HEADERS[location.pathname] ?? {
@@ -146,10 +126,6 @@ export function AppLayout() {
             const visibleItems = group.items.filter((item) => {
               if (item.requiresAdministrator) {
                 return isAdministrator;
-              }
-
-              if (item.requiresWritePermission) {
-                return canWriteMaintenance;
               }
 
               return true;

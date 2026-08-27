@@ -4,13 +4,15 @@ using SB.API_SB.Application.Interfaces.Common;
 using SB.API_SB.Domain.Constants;
 using SB.API_SB.Domain.Entities;
 using SB.API_SB.Domain.Enums;
+using SB.API_SB.Domain.Interfaces.Repositories;
 using SB.API_SB.Domain.ValueObjects;
 
 namespace SB.API_SB.Infrastructure.Persistence.Seeding;
 
 /// <summary>
-/// Siembra un historial de nominas de semanas anteriores para que el modulo de
-/// reportes tenga datos con los que trabajar desde el primer arranque.
+/// Siembra un historial de nominas de semanas anteriores, por entidad
+/// gubernamental, para que el modulo de reportes tenga datos con los que trabajar
+/// desde el primer arranque.
 /// </summary>
 /// <remarks>
 /// Las semanas historicas no se calculan con los datos vigentes de cada empleado:
@@ -23,20 +25,24 @@ namespace SB.API_SB.Infrastructure.Persistence.Seeding;
 public sealed class PayrollHistorySeeder
 {
     private const string SEED_USER_NAME = "Semilla";
+    private const string UNKNOWN_GOVERNMENT_ENTITY_NAME = "Entidad no disponible";
 
     /// <summary>Cantidad de semanas anteriores que se siembran como historial.</summary>
     public const int WEEKS_OF_HISTORY = 8;
 
     private readonly ApplicationDbContext databaseContext;
+    private readonly IGovernmentEntityRepository governmentEntityRepository;
     private readonly IDateTimeProvider dateTimeProvider;
     private readonly ILogger<PayrollHistorySeeder> logger;
 
     public PayrollHistorySeeder(
         ApplicationDbContext databaseContext,
+        IGovernmentEntityRepository governmentEntityRepository,
         IDateTimeProvider dateTimeProvider,
         ILogger<PayrollHistorySeeder> logger)
     {
         this.databaseContext = databaseContext;
+        this.governmentEntityRepository = governmentEntityRepository;
         this.dateTimeProvider = dateTimeProvider;
         this.logger = logger;
     }
@@ -56,37 +62,49 @@ public sealed class PayrollHistorySeeder
             return;
         }
 
-        List<Company> companies = await databaseContext.Companies
-            .Include(company => company.Employees)
-                .ThenInclude(employee => employee.Department)
+        // Los empleados se agrupan por entidad gubernamental aqui y no con una
+        // consulta que las una: la entidad vive en el archivo de texto plano y no
+        // hay ninguna union posible entre los dos almacenes.
+        List<Employee> employees = await databaseContext.Employees
+            .Include(employee => employee.Department)
+            .Where(employee => employee.Status == EmployeeStatus.Active)
             .ToListAsync(cancellationToken);
 
-        if (companies.Count == 0)
+        if (employees.Count == 0)
         {
             return;
         }
+
+        IReadOnlyDictionary<Guid, string> governmentEntityNames =
+            await governmentEntityRepository.GetNamesByIdentifierAsync(cancellationToken);
+
+        List<IGrouping<Guid, Employee>> employeesByEntity = employees
+            .GroupBy(employee => employee.GovernmentEntityId)
+            .ToList();
 
         // La semana en curso se deja sin generar a proposito: es la que el usuario
         // va a calcular para probar el flujo completo.
         PayrollWeek currentWeek = PayrollWeek.Current(dateTimeProvider.UtcNow);
         List<PayrollRun> payrollRuns = new();
 
-        foreach (Company company in companies)
+        foreach (IGrouping<Guid, Employee> entityEmployees in employeesByEntity)
         {
-            List<Employee> activeEmployees = company.Employees
-                .Where(employee => employee.Status == EmployeeStatus.Active)
-                .ToList();
+            string governmentEntityName = governmentEntityNames.TryGetValue(
+                entityEmployees.Key,
+                out string? resolvedName)
+                ? resolvedName
+                : UNKNOWN_GOVERNMENT_ENTITY_NAME;
 
-            if (activeEmployees.Count == 0)
-            {
-                continue;
-            }
-
+            List<Employee> entityEmployeeList = entityEmployees.ToList();
             PayrollWeek week = currentWeek.Previous();
 
             for (int weekIndex = 0; weekIndex < WEEKS_OF_HISTORY; weekIndex++)
             {
-                payrollRuns.Add(BuildPayrollRun(company, activeEmployees, week));
+                payrollRuns.Add(BuildPayrollRun(
+                    entityEmployees.Key,
+                    governmentEntityName,
+                    entityEmployeeList,
+                    week));
 
                 week = week.Previous();
             }
@@ -102,16 +120,18 @@ public sealed class PayrollHistorySeeder
         await databaseContext.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Se sembraron {PayrollRunCount} nominas historicas para {CompanyCount} compania(s), " +
-            "cubriendo las {WeeksOfHistory} semanas anteriores a {CurrentWeek}.",
+            "Se sembraron {PayrollRunCount} nominas historicas para " +
+            "{GovernmentEntityCount} entidad(es) gubernamental(es), cubriendo las " +
+            "{WeeksOfHistory} semanas anteriores a {CurrentWeek}.",
             payrollRuns.Count,
-            companies.Count,
+            employeesByEntity.Count,
             WEEKS_OF_HISTORY,
             currentWeek.Label);
     }
 
     private PayrollRun BuildPayrollRun(
-        Company company,
+        Guid governmentEntityId,
+        string governmentEntityName,
         IReadOnlyCollection<Employee> employees,
         PayrollWeek week)
     {
@@ -121,7 +141,8 @@ public sealed class PayrollHistorySeeder
 
         PayrollRun payrollRun = new()
         {
-            CompanyId = company.Id,
+            GovernmentEntityId = governmentEntityId,
+            GovernmentEntityName = governmentEntityName,
             Status = PayrollRunStatus.Generated,
             CreatedAt = generatedAt,
             CreatedBy = SEED_USER_NAME

@@ -121,10 +121,15 @@ public static class GovernmentEntityRecordMapper
             return null;
         }
 
+        string entityName = fields[SEED_FIELD_INDEX_NAME].Trim();
+
         return new GovernmentEntity
         {
-            Id = Guid.NewGuid(),
-            Name = fields[SEED_FIELD_INDEX_NAME].Trim(),
+            // El identificador se deriva del nombre y no se genera al azar: asi el
+            // archivo de datos se puede regenerar sin romper las referencias que los
+            // empleados y las nominas ya tienen hacia cada entidad.
+            Id = DeterministicIdentifierFactory.ForGovernmentEntity(entityName),
+            Name = entityName,
             Category = fields[SEED_FIELD_INDEX_CATEGORY].Trim(),
             StateBranch = fields[SEED_FIELD_INDEX_STATE_BRANCH].Trim(),
             Sector = fields[SEED_FIELD_INDEX_SECTOR].Trim(),

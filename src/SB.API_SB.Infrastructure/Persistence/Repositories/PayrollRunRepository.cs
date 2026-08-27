@@ -32,13 +32,11 @@ public sealed class PayrollRunRepository : Repository<PayrollRun>, IPayrollRunRe
             criteria.PageNumber,
             criteria.PageSize);
 
-        IQueryable<PayrollRun> query = EntitySet
-            .AsNoTracking()
-            .Include(payrollRun => payrollRun.Company);
+        IQueryable<PayrollRun> query = EntitySet.AsNoTracking();
 
-        if (criteria.CompanyId.HasValue)
+        if (criteria.GovernmentEntityId.HasValue)
         {
-            query = query.Where(payrollRun => payrollRun.CompanyId == criteria.CompanyId.Value);
+            query = query.Where(payrollRun => payrollRun.GovernmentEntityId == criteria.GovernmentEntityId.Value);
         }
 
         if (criteria.Year.HasValue)
@@ -61,7 +59,7 @@ public sealed class PayrollRunRepository : Repository<PayrollRun>, IPayrollRunRe
         List<PayrollRun> payrollRuns = await query
             .OrderByDescending(payrollRun => payrollRun.Year)
             .ThenByDescending(payrollRun => payrollRun.WeekNumber)
-            .ThenBy(payrollRun => payrollRun.CompanyId)
+            .ThenBy(payrollRun => payrollRun.GovernmentEntityName)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -74,7 +72,6 @@ public sealed class PayrollRunRepository : Repository<PayrollRun>, IPayrollRunRe
         Guid payrollRunId,
         CancellationToken cancellationToken = default) =>
         EntitySet
-            .Include(payrollRun => payrollRun.Company)
             .Include(payrollRun => payrollRun.Lines)
                 .ThenInclude(line => line.Components)
             // Sin division, una sola consulta multiplicaria las filas por el producto
@@ -85,7 +82,7 @@ public sealed class PayrollRunRepository : Repository<PayrollRun>, IPayrollRunRe
 
     /// <inheritdoc />
     public Task<PayrollRun?> FindGeneratedRunAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         PayrollWeek payrollWeek,
         CancellationToken cancellationToken = default)
     {
@@ -95,7 +92,7 @@ public sealed class PayrollRunRepository : Repository<PayrollRun>, IPayrollRunRe
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 payrollRun =>
-                    payrollRun.CompanyId == companyId &&
+                    payrollRun.GovernmentEntityId == governmentEntityId &&
                     payrollRun.Year == payrollWeek.Year &&
                     payrollRun.WeekNumber == payrollWeek.WeekNumber &&
                     payrollRun.Status == PayrollRunStatus.Generated,
@@ -104,13 +101,13 @@ public sealed class PayrollRunRepository : Repository<PayrollRun>, IPayrollRunRe
 
     /// <inheritdoc />
     public async Task<IReadOnlyCollection<int>> GetGeneratedWeekNumbersAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         int year,
         CancellationToken cancellationToken = default) =>
         await EntitySet
             .AsNoTracking()
             .Where(payrollRun =>
-                payrollRun.CompanyId == companyId &&
+                payrollRun.GovernmentEntityId == governmentEntityId &&
                 payrollRun.Year == year &&
                 payrollRun.Status == PayrollRunStatus.Generated)
             .Select(payrollRun => payrollRun.WeekNumber)

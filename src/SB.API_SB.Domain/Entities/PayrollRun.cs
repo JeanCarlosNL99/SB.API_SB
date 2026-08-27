@@ -5,7 +5,7 @@ using SB.API_SB.Domain.ValueObjects;
 namespace SB.API_SB.Domain.Entities;
 
 /// <summary>
-/// Ejecucion de nomina de una compania para una semana determinada.
+/// Ejecucion de nomina de una entidad gubernamental para una semana determinada.
 /// </summary>
 /// <remarks>
 /// Una ejecucion es un documento historico, no una consulta. Sus lineas guardan
@@ -16,11 +16,20 @@ namespace SB.API_SB.Domain.Entities;
 /// </remarks>
 public sealed class PayrollRun : AuditableEntity
 {
-    /// <summary>Compania a la que corresponde la nomina.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>Entidad gubernamental a la que corresponde la nomina.</summary>
+    public Guid GovernmentEntityId { get; set; }
 
-    /// <summary>Compania a la que corresponde la nomina.</summary>
-    public Company? Company { get; set; }
+    /// <summary>
+    /// Nombre de la entidad gubernamental al momento de generar la nomina.
+    /// </summary>
+    /// <remarks>
+    /// El nombre se copia en el documento, no se consulta al mostrarlo. Es la
+    /// misma decision que rige las lineas: la nomina es una instantanea de lo que
+    /// se pago. Aqui es ademas indispensable, porque la entidad gubernamental vive
+    /// en el archivo de texto plano y ninguna consulta relacional puede unirla con
+    /// el historial.
+    /// </remarks>
+    public string GovernmentEntityName { get; set; } = string.Empty;
 
     /// <summary>Ano ISO 8601 de la semana pagada.</summary>
     public int Year { get; set; }

@@ -71,15 +71,16 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(employee => new { employee.DepartmentId, employee.Status })
             .HasDatabaseName("IX_Employees_DepartmentId_Status");
 
-        // Indice que respalda tanto el filtro por compania de la consulta como la
-        // seleccion de empleados activos al calcular la nomina semanal.
-        builder.HasIndex(employee => new { employee.CompanyId, employee.Status })
-            .HasDatabaseName("IX_Employees_CompanyId_Status");
-
-        builder.HasOne(employee => employee.Company)
-            .WithMany(company => company.Employees)
-            .HasForeignKey(employee => employee.CompanyId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Indice que respalda tanto el filtro por entidad gubernamental de la
+        // consulta como la seleccion de empleados al calcular la nomina semanal.
+        //
+        // No hay clave foranea hacia la entidad gubernamental, y no puede haberla:
+        // el listado oficial vive en el archivo de texto plano y una base de datos
+        // relacional no puede imponer integridad referencial contra un almacen que
+        // no administra. La comprobacion se hace en la capa de servicios, que
+        // valida contra el catalogo antes de aceptar el empleado.
+        builder.HasIndex(employee => new { employee.GovernmentEntityId, employee.Status })
+            .HasDatabaseName("IX_Employees_GovernmentEntityId_Status");
 
         builder.HasOne(employee => employee.Department)
             .WithMany(department => department.Employees)

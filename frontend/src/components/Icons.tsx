@@ -153,18 +153,6 @@ export function InstitutionIcon(props: IconProps) {
   );
 }
 
-/** Icono de compania. */
-export function CompanyIcon(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <rect x="3" y="7" width="12" height="14" rx="1.5" />
-      <path d="M15 11h5a1 1 0 0 1 1 1v9h-6" />
-      <path d="M7 11h2M7 15h2M7 19h2M12 11h.01M12 15h.01M12 19h.01" />
-      <path d="M3 7l6-4 6 4" />
-    </IconBase>
-  );
-}
-
 /** Icono de historial. */
 export function HistoryIcon(props: IconProps) {
   return (

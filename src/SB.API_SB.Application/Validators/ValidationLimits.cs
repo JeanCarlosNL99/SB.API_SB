@@ -43,7 +43,7 @@ public static class ValidationLimits
     /// <summary>Longitud maxima admitida para una contrasena.</summary>
     public const int PASSWORD_MAXIMUM_LENGTH = 100;
 
-    /// <summary>Longitud maxima de la razon social de una compania.</summary>
+    /// <summary>Longitud maxima de la razon social de una entidad gubernamental.</summary>
     public const int COMPANY_NAME_MAXIMUM_LENGTH = 200;
 
     /// <summary>Longitud maxima del Registro Nacional de Contribuyente.</summary>

@@ -13,8 +13,8 @@ export function PayrollRunDetailView({ detail }: { detail: PayrollRunDetail }) {
   return (
     <div>
       <div className="detail-row">
-        <span className="detail-row__label">Compania</span>
-        <span className="detail-row__value">{summary.companyName}</span>
+        <span className="detail-row__label">Entidad gubernamental</span>
+        <span className="detail-row__value">{summary.governmentEntityName}</span>
       </div>
       <div className="detail-row">
         <span className="detail-row__label">Semana pagada</span>

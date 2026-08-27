@@ -1,7 +1,6 @@
 import { buildQueryParameters, httpClient } from './httpClient';
 import type {
   AuthenticationResponse,
-  CreateGovernmentEntityRequest,
   CreateUserRequest,
   Department,
   Employee,
@@ -10,10 +9,10 @@ import type {
   GovernmentEntity,
   GovernmentEntityCatalogs,
   GovernmentEntityFilter,
+  GovernmentEntityOption,
   LoginRequest,
   PagedResponse,
   Role,
-  UpdateGovernmentEntityRequest,
   UpdateUserRequest,
   User,
 } from '@/types/api';
@@ -57,32 +56,17 @@ export const governmentEntitiesApi = {
     return data;
   },
 
-  /** Registra una nueva entidad gubernamental. */
-  async create(request: CreateGovernmentEntityRequest): Promise<GovernmentEntity> {
-    const { data } = await httpClient.post<GovernmentEntity>(
-      '/entidades-gubernamentales',
-      request,
+  /**
+   * Obtiene el listado completo de entidades activas para alimentar los
+   * selectores. No usa la consulta paginada a proposito: esta recortaria el
+   * listado en silencio si el listado oficial superara el tamano de pagina.
+   */
+  async getOptions(): Promise<GovernmentEntityOption[]> {
+    const { data } = await httpClient.get<GovernmentEntityOption[]>(
+      '/entidades-gubernamentales/opciones',
     );
 
     return data;
-  },
-
-  /** Actualiza una entidad gubernamental existente. */
-  async update(
-    entityId: string,
-    request: UpdateGovernmentEntityRequest,
-  ): Promise<GovernmentEntity> {
-    const { data } = await httpClient.put<GovernmentEntity>(
-      `/entidades-gubernamentales/${entityId}`,
-      request,
-    );
-
-    return data;
-  },
-
-  /** Elimina una entidad gubernamental. */
-  async remove(entityId: string): Promise<void> {
-    await httpClient.delete(`/entidades-gubernamentales/${entityId}`);
   },
 };
 

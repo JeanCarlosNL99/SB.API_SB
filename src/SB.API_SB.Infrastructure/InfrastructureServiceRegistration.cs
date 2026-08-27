@@ -115,7 +115,6 @@ public static class InfrastructureServiceRegistration
             serviceProvider.GetRequiredService<ApplicationDbContext>());
 
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-        services.AddScoped<ICompanyRepository, CompanyRepository>();
         services.AddScoped<IPayrollRunRepository, PayrollRunRepository>();
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IUserRepository, UserRepository>();

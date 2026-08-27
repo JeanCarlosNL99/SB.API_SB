@@ -31,13 +31,14 @@ public sealed class EmployeeServiceTests
     private static readonly Guid INACTIVE_DEPARTMENT_ID =
         Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-    private static readonly Guid COMPANY_ID =
+    private static readonly Guid GOVERNMENT_ENTITY_ID =
         Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     private readonly IEmployeeRepository employeeRepository = Substitute.For<IEmployeeRepository>();
     private readonly IDepartmentRepository departmentRepository =
         Substitute.For<IDepartmentRepository>();
-    private readonly ICompanyRepository companyRepository = Substitute.For<ICompanyRepository>();
+    private readonly IGovernmentEntityRepository governmentEntityRepository =
+        Substitute.For<IGovernmentEntityRepository>();
     private readonly IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly EmployeeService employeeService;
 
@@ -63,19 +64,22 @@ public sealed class EmployeeServiceTests
                 IsActive = false
             });
 
-        companyRepository
-            .GetByIdAsync(COMPANY_ID, Arg.Any<CancellationToken>())
-            .Returns(new Company
+        governmentEntityRepository
+            .GetByIdAsync(GOVERNMENT_ENTITY_ID, Arg.Any<CancellationToken>())
+            .Returns(new GovernmentEntity
             {
-                Id = COMPANY_ID,
-                Name = "Servicios Financieros del Caribe, S. A.",
-                IsActive = true
+                Id = GOVERNMENT_ENTITY_ID,
+                Name = "Direccion General de Impuestos Internos",
+                Category = "Organismo Descentralizado Funcionalmente",
+                StateBranch = "Poder Ejecutivo",
+                Sector = "Hacienda",
+                Status = RecordStatus.Active
             });
 
         employeeService = new EmployeeService(
             employeeRepository,
             departmentRepository,
-            companyRepository,
+            governmentEntityRepository,
             EmployeeTypeHandlerResolverFactory.Create(),
             unitOfWork,
             NullLogger<EmployeeService>.Instance);
@@ -154,6 +158,50 @@ public sealed class EmployeeServiceTests
         Assert.Contains("inactivo", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Es la prueba que cubre el hueco dejado por la ausencia de clave foranea:
+    /// la entidad gubernamental vive en el archivo de texto plano y el empleado en
+    /// la base de datos relacional, de modo que ningun motor puede rechazar por si
+    /// solo una referencia invalida. Si esta comprobacion desapareciera, se
+    /// podrian registrar empleados apuntando a entidades que no existen.
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_EntidadGubernamentalInexistente_LanzaExcepcionDeNoEncontrado()
+    {
+        CreateEmployeeRequest request = BuildHourlyRequest();
+        request.GovernmentEntityId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+
+        await Assert.ThrowsAsync<EntityNotFoundException>(
+            () => employeeService.CreateAsync(request));
+
+        await unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_EntidadGubernamentalInactiva_LanzaExcepcionDeReglaDeNegocio()
+    {
+        Guid inactiveEntityId = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+        governmentEntityRepository
+            .GetByIdAsync(inactiveEntityId, Arg.Any<CancellationToken>())
+            .Returns(new GovernmentEntity
+            {
+                Id = inactiveEntityId,
+                Name = "Entidad Suprimida",
+                Status = RecordStatus.Inactive
+            });
+
+        CreateEmployeeRequest request = BuildHourlyRequest();
+        request.GovernmentEntityId = inactiveEntityId;
+
+        BusinessRuleViolationException exception =
+            await Assert.ThrowsAsync<BusinessRuleViolationException>(
+                () => employeeService.CreateAsync(request));
+
+        Assert.Contains("inactiva", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+
     [Fact]
     public async Task UpdateAsync_IntentoDeCambiarElTipoDeContrato_LanzaExcepcionDeReglaDeNegocio()
     {
@@ -166,7 +214,7 @@ public sealed class EmployeeServiceTests
                 Id = employeeId,
                 PaternalLastName = "Diaz",
                 SocialSecurityNumber = "001-9999999-9",
-                CompanyId = COMPANY_ID,
+                GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
                 HourlyWage = 300m,
                 HoursWorked = 45m
@@ -178,7 +226,7 @@ public sealed class EmployeeServiceTests
             FirstName = "Juan",
             PaternalLastName = "Diaz",
             SocialSecurityNumber = "001-9999999-9",
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
             Status = EmployeeStatus.Active,
             WeeklySalary = 40_000m
@@ -198,7 +246,7 @@ public sealed class EmployeeServiceTests
             Id = employeeId,
             PaternalLastName = "Diaz",
             SocialSecurityNumber = "001-9999999-9",
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
             HourlyWage = 300m,
             HoursWorked = 40m
@@ -217,7 +265,7 @@ public sealed class EmployeeServiceTests
             Type = EmployeeType.Hourly,
             PaternalLastName = "Diaz",
             SocialSecurityNumber = "001-9999999-9",
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
             Status = EmployeeStatus.Active,
             HourlyWage = 300m,
@@ -243,7 +291,7 @@ public sealed class EmployeeServiceTests
         EmployeeFilterRequest filter = new()
         {
             Name = "Diaz",
-            CompanyId = COMPANY_ID,
+            GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
             Status = EmployeeStatus.Active,
             PageNumber = 2,
@@ -280,7 +328,7 @@ public sealed class EmployeeServiceTests
         Type = EmployeeType.Hourly,
         PaternalLastName = "Diaz",
         SocialSecurityNumber = "001-9999999-9",
-        CompanyId = COMPANY_ID,
+        GovernmentEntityId = GOVERNMENT_ENTITY_ID,
         DepartmentId = ACTIVE_DEPARTMENT_ID,
         Status = EmployeeStatus.Active,
         HourlyWage = 300m,

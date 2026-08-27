@@ -4,9 +4,13 @@ using SB.API_SB.Application.Contracts.GovernmentEntities;
 namespace SB.API_SB.Application.Interfaces.Services;
 
 /// <summary>
-/// Casos de uso del mantenimiento de entidades gubernamentales de la Republica
-/// Dominicana.
+/// Casos de uso de la consulta del listado de entidades gubernamentales de la
+/// Republica Dominicana.
 /// </summary>
+/// <remarks>
+/// El listado es un catalogo de solo lectura: se distribuye con la aplicacion en
+/// el archivo de texto plano y es la fuente a la que se asocia cada empleado.
+/// </remarks>
 public interface IGovernmentEntityService
 {
     /// <summary>Consulta entidades gubernamentales con filtros y paginacion.</summary>
@@ -25,28 +29,14 @@ public interface IGovernmentEntityService
         Guid entityId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Registra una nueva entidad gubernamental.</summary>
-    /// <param name="request">Datos de la entidad.</param>
+    /// <summary>
+    /// Obtiene el listado completo de entidades activas, reducido a identificador
+    /// y nombre, para alimentar los selectores de la interfaz.
+    /// </summary>
     /// <param name="cancellationToken">Token de cancelacion.</param>
-    /// <returns>La entidad registrada.</returns>
-    Task<GovernmentEntityResponse> CreateAsync(
-        CreateGovernmentEntityRequest request,
+    /// <returns>Entidades activas ordenadas por nombre.</returns>
+    Task<IReadOnlyCollection<GovernmentEntityOptionResponse>> GetSelectionOptionsAsync(
         CancellationToken cancellationToken = default);
-
-    /// <summary>Actualiza una entidad gubernamental existente.</summary>
-    /// <param name="entityId">Identificador del registro.</param>
-    /// <param name="request">Nuevos datos de la entidad.</param>
-    /// <param name="cancellationToken">Token de cancelacion.</param>
-    /// <returns>La entidad actualizada.</returns>
-    Task<GovernmentEntityResponse> UpdateAsync(
-        Guid entityId,
-        UpdateGovernmentEntityRequest request,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>Elimina una entidad gubernamental.</summary>
-    /// <param name="entityId">Identificador del registro.</param>
-    /// <param name="cancellationToken">Token de cancelacion.</param>
-    Task DeleteAsync(Guid entityId, CancellationToken cancellationToken = default);
 
     /// <summary>Obtiene los catalogos que alimentan los filtros de la interfaz.</summary>
     /// <param name="cancellationToken">Token de cancelacion.</param>

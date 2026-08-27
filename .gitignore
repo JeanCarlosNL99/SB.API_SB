@@ -32,11 +32,9 @@ yarn-error.log*
 ## ---------------------------------------------------------------------------
 ## La base de datos de texto plano se genera en el primer arranque a partir de
 ## GovernmentEntities.seed.txt, que si esta versionado. Se excluye el archivo
-## generado para que los datos capturados durante las pruebas de cada
-## desarrollador no entren al control de versiones.
+## generado porque es derivado: los identificadores se derivan del nombre de cada
+## entidad, de modo que regenerarlo produce exactamente el mismo contenido.
 src/SB.API_SB.Presentation/Database/GovernmentEntities.txt
-src/SB.API_SB.Presentation/Database/GovernmentEntities.txt.tmp
-src/SB.API_SB.Presentation/Database/Backups/
 
 ## Base de datos SQLite de desarrollo y registros de la aplicacion.
 *.db

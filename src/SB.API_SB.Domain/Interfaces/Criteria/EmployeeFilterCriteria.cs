@@ -12,8 +12,8 @@ public sealed class EmployeeFilterCriteria
     /// <summary>Texto a buscar en el nombre o apellido del empleado.</summary>
     public string? Name { get; init; }
 
-    /// <summary>Compania por la que se desea filtrar.</summary>
-    public Guid? CompanyId { get; init; }
+    /// <summary>Entidad gubernamental por la que se desea filtrar.</summary>
+    public Guid? GovernmentEntityId { get; init; }
 
     /// <summary>Departamento por el que se desea filtrar.</summary>
     public Guid? DepartmentId { get; init; }

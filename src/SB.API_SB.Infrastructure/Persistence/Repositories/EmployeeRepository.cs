@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SB.API_SB.Domain.Common;
 using SB.API_SB.Domain.Entities;
+using SB.API_SB.Domain.Enums;
 using SB.API_SB.Domain.Interfaces.Criteria;
 using SB.API_SB.Domain.Interfaces.Repositories;
 using SB.API_SB.Infrastructure.Persistence.Configurations;
@@ -56,23 +57,22 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
         CancellationToken cancellationToken = default) =>
         EntitySet
             .Include(employee => employee.Department)
-            .Include(employee => employee.Company)
             .FirstOrDefaultAsync(employee => employee.Id == employeeId, cancellationToken);
 
     /// <inheritdoc />
     public async Task<IReadOnlyCollection<Employee>> GetForPayrollAsync(
-        Guid companyId,
+        Guid governmentEntityId,
         bool onlyActiveEmployees,
         CancellationToken cancellationToken = default)
     {
         IQueryable<Employee> query = EntitySet
             .AsNoTracking()
             .Include(employee => employee.Department)
-            .Where(employee => employee.CompanyId == companyId);
+            .Where(employee => employee.GovernmentEntityId == governmentEntityId);
 
         if (onlyActiveEmployees)
         {
-            query = query.Where(employee => employee.Status == Domain.Enums.EmployeeStatus.Active);
+            query = query.Where(employee => employee.Status == EmployeeStatus.Active);
         }
 
         return await query
@@ -80,6 +80,18 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
             .ThenBy(employee => employee.FirstName)
             .ToListAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyCollection<GovernmentEntityEmployeeCount>>
+        CountByGovernmentEntityAsync(CancellationToken cancellationToken = default) =>
+        await EntitySet
+            .AsNoTracking()
+            .GroupBy(employee => employee.GovernmentEntityId)
+            .Select(group => new GovernmentEntityEmployeeCount(
+                group.Key,
+                group.Count(),
+                group.Count(employee => employee.Status == EmployeeStatus.Active)))
+            .ToListAsync(cancellationToken);
 
     /// <inheritdoc />
     public Task<bool> ExistsBySocialSecurityNumberAsync(
@@ -103,8 +115,7 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
     {
         IQueryable<Employee> query = EntitySet
             .AsNoTracking()
-            .Include(employee => employee.Department)
-            .Include(employee => employee.Company);
+            .Include(employee => employee.Department);
 
         if (!string.IsNullOrWhiteSpace(criteria.Name))
         {
@@ -116,9 +127,9 @@ public sealed class EmployeeRepository : Repository<Employee>, IEmployeeReposito
                  EF.Functions.Like(employee.FirstName, $"%{searchTerm}%")));
         }
 
-        if (criteria.CompanyId.HasValue)
+        if (criteria.GovernmentEntityId.HasValue)
         {
-            query = query.Where(employee => employee.CompanyId == criteria.CompanyId.Value);
+            query = query.Where(employee => employee.GovernmentEntityId == criteria.GovernmentEntityId.Value);
         }
 
         if (criteria.DepartmentId.HasValue)

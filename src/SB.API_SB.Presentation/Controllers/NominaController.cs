@@ -8,12 +8,12 @@ using SB.API_SB.Presentation.Authorization;
 namespace SB.API_SB.Presentation.Controllers;
 
 /// <summary>
-/// Calculo de pagos semanales por compania.
+/// Calculo de pagos semanales por entidad gubernamental.
 /// </summary>
 /// <remarks>
 /// El flujo previsto es: consultar la vista previa de la semana, generar la
 /// ejecucion y consultarla despues en el historial. Una semana solo puede
-/// generarse una vez por compania.
+/// generarse una vez por entidad gubernamental.
 /// </remarks>
 [ApiController]
 [Route("api/nomina")]
@@ -32,7 +32,7 @@ public sealed class NominaController : ControllerBase
     /// Calcula la nomina de una semana sin almacenarla, para revisarla antes de
     /// generarla. Indica tambien si la semana ya fue pagada.
     /// </summary>
-    /// <param name="companyId">Compania a calcular.</param>
+    /// <param name="governmentEntityId">Entidad gubernamental a calcular.</param>
     /// <param name="year">Ano ISO 8601 de la semana.</param>
     /// <param name="weekNumber">Numero de semana ISO 8601.</param>
     /// <param name="onlyActiveEmployees">Indica si se limita a empleados activos.</param>
@@ -40,20 +40,20 @@ public sealed class NominaController : ControllerBase
     /// <returns>Calculo propuesto para la semana.</returns>
     /// <response code="200">Vista previa calculada correctamente.</response>
     /// <response code="400">La semana indicada no existe en el calendario.</response>
-    /// <response code="404">La compania no existe.</response>
+    /// <response code="404">La entidad gubernamental no existe.</response>
     [HttpGet("vista-previa")]
     [ProducesResponseType(typeof(PayrollPreviewResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PayrollPreviewResponse>> ObtenerVistaPrevia(
-        [FromQuery] Guid companyId,
+        [FromQuery] Guid governmentEntityId,
         [FromQuery] int year,
         [FromQuery] int weekNumber,
         [FromQuery] bool onlyActiveEmployees = true,
         CancellationToken cancellationToken = default)
     {
         PayrollPreviewResponse response = await payrollRunService.PreviewAsync(
-            companyId,
+            governmentEntityId,
             year,
             weekNumber,
             onlyActiveEmployees,
@@ -63,15 +63,15 @@ public sealed class NominaController : ControllerBase
     }
 
     /// <summary>
-    /// Genera y almacena la nomina de una semana. Si la compania ya tiene esa
+    /// Genera y almacena la nomina de una semana. Si la entidad gubernamental ya tiene esa
     /// semana pagada, la operacion se rechaza.
     /// </summary>
-    /// <param name="request">Compania, semana y alcance del calculo.</param>
+    /// <param name="request">Entidad gubernamental, semana y alcance del calculo.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>La ejecucion generada con su detalle.</returns>
     /// <response code="201">Nomina generada correctamente.</response>
-    /// <response code="400">Datos invalidos, semana futura o compania sin empleados.</response>
-    /// <response code="404">La compania no existe.</response>
+    /// <response code="400">Datos invalidos, semana futura o entidad gubernamental sin empleados.</response>
+    /// <response code="404">La entidad gubernamental no existe.</response>
     /// <response code="409">La semana ya tiene nomina generada.</response>
     [HttpPost("ejecuciones")]
     [Authorize(Policy = AuthorizationPolicies.MAINTENANCE_WRITE)]
@@ -94,10 +94,30 @@ public sealed class NominaController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene las entidades gubernamentales que tienen empleados registrados y
+    /// por tanto nomina que calcular.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelacion.</param>
+    /// <returns>Entidades con nomina, con su cantidad de empleados.</returns>
+    /// <response code="200">Consulta ejecutada correctamente.</response>
+    [HttpGet("entidades")]
+    [ProducesResponseType(
+        typeof(IReadOnlyCollection<PayableGovernmentEntityResponse>),
+        StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyCollection<PayableGovernmentEntityResponse>>>
+        ConsultarEntidadesConNomina(CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<PayableGovernmentEntityResponse> response =
+            await payrollRunService.GetPayableEntitiesAsync(cancellationToken);
+
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Consulta el historial de nominas generadas, de la mas reciente a la mas
     /// antigua.
     /// </summary>
-    /// <param name="filter">Filtros por compania, ano y paginacion.</param>
+    /// <param name="filter">Filtros por entidad gubernamental, ano y paginacion.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Pagina del historial.</returns>
     /// <response code="200">Consulta ejecutada correctamente.</response>
@@ -170,25 +190,25 @@ public sealed class NominaController : ControllerBase
 
     /// <summary>
     /// Obtiene las semanas de un ano que ya tienen nomina generada para una
-    /// compania. Permite que la interfaz muestre el estado de cada semana sin
+    /// entidad gubernamental. Permite que la interfaz muestre el estado de cada semana sin
     /// recorrer el historial completo.
     /// </summary>
-    /// <param name="companyId">Compania consultada.</param>
+    /// <param name="governmentEntityId">Entidad gubernamental consultada.</param>
     /// <param name="year">Ano consultado.</param>
     /// <param name="cancellationToken">Token de cancelacion.</param>
     /// <returns>Semanas con nomina vigente.</returns>
     /// <response code="200">Consulta ejecutada correctamente.</response>
-    /// <response code="404">La compania no existe.</response>
+    /// <response code="404">La entidad gubernamental no existe.</response>
     [HttpGet("semanas-generadas")]
     [ProducesResponseType(typeof(GeneratedWeeksResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<GeneratedWeeksResponse>> ObtenerSemanasGeneradas(
-        [FromQuery] Guid companyId,
+        [FromQuery] Guid governmentEntityId,
         [FromQuery] int year,
         CancellationToken cancellationToken)
     {
         GeneratedWeeksResponse response = await payrollRunService.GetGeneratedWeeksAsync(
-            companyId,
+            governmentEntityId,
             year,
             cancellationToken);
 

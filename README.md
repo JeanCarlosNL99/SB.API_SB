@@ -6,14 +6,16 @@ aplicación web en React + TypeScript que consume esa API.
 
 La solución cubre cuatro módulos:
 
-1. **Entidades gubernamentales** — mantenimiento del listado oficial de la
-   República Dominicana (181 registros), persistido en un **archivo de texto
-   plano** ubicado dentro del propio proyecto.
-2. **Compañías y empleados** — cada empleado pertenece a una compañía; captura de
-   datos por tipo de contrato y filtros por nombre, compañía, departamento y estado.
+1. **Entidades gubernamentales** — consulta del listado oficial de la República
+   Dominicana (181 registros), persistido en un **archivo de texto plano** ubicado
+   dentro del propio proyecto. Es un catálogo de solo lectura y es la fuente a la
+   que se asocia cada empleado.
+2. **Empleados** — cada empleado pertenece a una **entidad gubernamental** del
+   listado oficial; captura de datos por tipo de contrato y filtros por nombre,
+   entidad, departamento y estado.
 3. **Cálculo de pagos semanales** — generación de la nómina de una semana por
-   compañía, con historial de semanas anteriores. **Una semana solo puede pagarse
-   una vez.**
+   entidad gubernamental, con historial de semanas anteriores. **Una semana solo
+   puede pagarse una vez.**
 4. **Usuarios, roles y registro de eventos** — autenticación con **JWT**
    (`Authorization: Bearer`), autorización por rol y consulta del log desde la
    propia aplicación (solo administrador).
@@ -108,7 +110,7 @@ SB.API_SB.sln
 │       ├── Database/               → Base de datos de texto plano (dentro del proyecto)
 │       └── Logs/                   → Registro de Serilog (texto y JSON), consultable desde la app
 ├── tests/
-│   └── SB.API_SB.Tests             → 98 pruebas unitarias (xUnit + NSubstitute)
+│   └── SB.API_SB.Tests             → 107 pruebas unitarias (xUnit + NSubstitute)
 ├── frontend/                       → Aplicación React + TypeScript (Vite)
 └── docs/                           → Reporte técnico y respuestas de conceptualización
 ```
@@ -164,12 +166,23 @@ a cada almacén el módulo que le corresponde:
 
 | Módulo | Almacén | Motivo |
 |---|---|---|
-| Entidades gubernamentales | Archivo de texto plano dentro del proyecto | Requisito explícito del mantenimiento solicitado. |
-| Compañías, empleados, departamentos, nóminas, usuarios y roles | Base de datos relacional con EF Core | Requieren relaciones, índices únicos y transacciones. |
+| Entidades gubernamentales | Archivo de texto plano dentro del proyecto | Requisito explícito del enunciado. Es un catálogo de solo lectura. |
+| Empleados, departamentos, nóminas, usuarios y roles | Base de datos relacional con EF Core | Requieren relaciones, índices únicos y transacciones. |
 
 Las dos implementaciones satisfacen contratos declarados en el Dominio
 (`IGovernmentEntityRepository`, `IEmployeeRepository`, …), por lo que **la lógica
 de negocio no sabe cuál tecnología la respalda**.
+
+**Consecuencia de tener dos almacenes.** Un empleado apunta a una entidad
+gubernamental que vive en el archivo de texto plano, de modo que **no puede haber
+clave foránea entre ambos**: una base de datos relacional no impone integridad
+referencial contra un almacén que no administra. La solución lo resuelve en dos
+puntos:
+
+| Problema | Solución |
+|---|---|
+| Nada impediría registrar un empleado apuntando a una entidad inexistente | La capa de servicios valida contra el catálogo antes de aceptar el registro, y devuelve **HTTP 404** si la entidad no existe. Hay pruebas que fijan ese comportamiento. |
+| El archivo de datos se genera en el primer arranque y no se versiona: con identificadores aleatorios, regenerarlo rompería todas las referencias en silencio | Los identificadores se **derivan del nombre oficial** de cada entidad (`DeterministicIdentifierFactory`). El mismo nombre produce siempre el mismo identificador, de modo que el archivo se puede borrar y regenerar sin perder ninguna asociación. |
 
 ---
 
@@ -179,20 +192,20 @@ de negocio no sabe cuál tecnología la respalda**.
 dotnet test
 ```
 
-98 pruebas unitarias distribuidas así:
+107 pruebas unitarias distribuidas así:
 
 | Área | Archivo | Qué verifica |
 |---|---|---|
 | Cálculo de nómina | `PayrollCalculationTests` | Las cuatro fórmulas y el límite exacto de las 40 horas. |
 | Validaciones por tipo | `EmployeeRequestValidationTests` | Que cada regla se active solo para el tipo que corresponde. |
-| Reglas de negocio | `EmployeeServiceTests` | Duplicados, departamento inactivo, cambio de tipo prohibido. |
-| Reporte de nómina | `PayrollReportServiceTests` | Totales, agrupaciones y el límite de 1,000 empleados en menos de 2 s. |
-| Archivo de texto plano | `GovernmentEntityFileRepositoryTests` | CRUD real sobre disco, filtros y paginación. |
+| Reglas de negocio | `EmployeeServiceTests` | Duplicados, departamento inactivo, cambio de tipo prohibido y entidad gubernamental inexistente o inactiva. |
+| Pago semanal | `PayrollRunServiceTests` | Que una semana no se pueda pagar dos veces, la instantánea del cálculo, la anulación y el límite de 1,000 empleados en menos de 2 s. |
+| Semana de nómina | `PayrollWeekTests` | Identidad ISO 8601 de la semana, límites de fin de año y años de 53 semanas. |
+| Archivo de texto plano | `GovernmentEntityFileRepositoryTests` | El recorrido completo semilla → archivo generado → consulta, con filtros y paginación. |
+| Identificadores estables | `DeterministicIdentifierFactoryTests` | Que regenerar el archivo no cambie ningún identificador. |
 | Formato del archivo | `FlatFileRecordSerializerTests` | Escape reversible de `|`, `\` y saltos de línea. |
 | Seguridad | `PasswordHasherTests` | Derivación PBKDF2, sales distintas y verificación. |
 | Extensibilidad | `EmployeeTypeHandlerResolverTests` | Que todo tipo del enumerado tenga manejador registrado. |
-| Semana de nómina | `PayrollWeekTests` | Identidad ISO 8601 de la semana, límites de fin de año y años de 53 semanas. |
-| Pago semanal | `PayrollRunServiceTests` | Que una semana no se pueda pagar dos veces, la instantánea del cálculo, la anulación y el límite de 1,000 empleados en menos de 2 s. |
 
 Frontend:
 
@@ -213,30 +226,26 @@ Todos los endpoints, salvo los indicados, exigen el encabezado
 |---|---|---|
 | `POST` | `/api/autenticacion/iniciar-sesion` | Emite el token JWT. **Anónimo.** |
 | `GET` | `/api/autenticacion/sesion-actual` | Devuelve la identidad del token. |
-
 ### Entidades gubernamentales
 
-| Método | Ruta | Rol requerido |
-|---|---|---|
-| `GET` | `/api/entidades-gubernamentales` | Cualquier rol |
-| `GET` | `/api/entidades-gubernamentales/catalogos` | Cualquier rol |
-| `GET` | `/api/entidades-gubernamentales/{id}` | Cualquier rol |
-| `POST` | `/api/entidades-gubernamentales` | Administrador o RecursosHumanos |
-| `PUT` | `/api/entidades-gubernamentales/{id}` | Administrador o RecursosHumanos |
-| `DELETE` | `/api/entidades-gubernamentales/{id}` | Administrador o RecursosHumanos |
+El listado oficial es un **catálogo de solo lectura**: se distribuye con la
+aplicación en el archivo de texto plano y es la fuente a la que se asocia cada
+empleado. Por eso el módulo expone únicamente operaciones de consulta.
+
+| Método | Ruta | Descripción | Rol requerido |
+|---|---|---|---|
+| `GET` | `/api/entidades-gubernamentales` | Consulta paginada con filtros | Cualquier rol |
+| `GET` | `/api/entidades-gubernamentales/catalogos` | Valores distintos de categoría, sector y poder del Estado | Cualquier rol |
+| `GET` | `/api/entidades-gubernamentales/opciones` | Listado completo (identificador y nombre) para alimentar selectores | Cualquier rol |
+| `GET` | `/api/entidades-gubernamentales/{id}` | Una entidad por su identificador | Cualquier rol |
 
 Filtros aceptados en la consulta: `name`, `category`, `sector`, `stateBranch`,
 `status`, `pageNumber`, `pageSize`.
 
-### Compañías
-
-| Método | Ruta | Rol requerido |
-|---|---|---|
-| `GET` | `/api/companias` | Cualquier rol |
-| `GET` | `/api/companias/{id}` | Cualquier rol |
-| `POST` | `/api/companias` | Administrador o RecursosHumanos |
-| `PUT` | `/api/companias/{id}` | Administrador o RecursosHumanos |
-| `DELETE` | `/api/companias/{id}` | Administrador |
+`/opciones` existe aparte de la consulta paginada por una razón concreta: un
+selector necesita el listado completo, y llenarlo pidiendo una página muy grande
+funcionaría hoy —con 181 entidades— para empezar a **recortar el listado en
+silencio** el día que el listado oficial supere el tamaño máximo de página.
 
 ### Empleados
 
@@ -249,13 +258,17 @@ Filtros aceptados en la consulta: `name`, `category`, `sector`, `stateBranch`,
 | `DELETE` | `/api/empleados/{id}` | Administrador o RecursosHumanos |
 | `GET` | `/api/departamentos` | Cualquier rol |
 
-Filtros de empleados: `name`, `companyId`, `departmentId`, `status`, `type`,
-`pageNumber`, `pageSize`.
+Filtros de empleados: `name`, `governmentEntityId`, `departmentId`, `status`,
+`type`, `pageNumber`, `pageSize`.
+
+El alta y la actualización exigen `governmentEntityId`. Si la entidad no existe
+en el catálogo la operación devuelve **404**; si está inactiva, **400**.
 
 ### Cálculo de pagos semanales
 
 | Método | Ruta | Descripción | Rol requerido |
 |---|---|---|---|
+| `GET` | `/api/nomina/entidades` | Entidades que tienen empleados y por tanto nómina que calcular | Cualquier rol |
 | `GET` | `/api/nomina/vista-previa` | Calcula la semana sin guardarla e informa si ya fue pagada | Cualquier rol |
 | `POST` | `/api/nomina/ejecuciones` | Genera el pago de la semana. **409 si ya existe** | Administrador o RecursosHumanos |
 | `GET` | `/api/nomina/ejecuciones` | Historial paginado | Cualquier rol |
@@ -263,8 +276,8 @@ Filtros de empleados: `name`, `companyId`, `departmentId`, `status`, `type`,
 | `POST` | `/api/nomina/ejecuciones/{id}/anular` | Anula y libera la semana | Administrador |
 | `GET` | `/api/nomina/semanas-generadas` | Semanas ya pagadas de un año | Cualquier rol |
 
-Parámetros de la vista previa: `companyId`, `year`, `weekNumber`,
-`onlyActiveEmployees`. Filtros del historial: `companyId`, `year`,
+Parámetros de la vista previa: `governmentEntityId`, `year`, `weekNumber`,
+`onlyActiveEmployees`. Filtros del historial: `governmentEntityId`, `year`,
 `includeCancelled`, `pageNumber`, `pageSize`.
 
 ### Registro de eventos
@@ -301,29 +314,33 @@ aplicación en cada uno.
 
 ### 7.1 En el portal web
 
-1. **Registrar las compañías** (menú *Nómina → Compañías*). Cada compañía tiene
-   razón social y Registro Nacional de Contribuyente único.
-2. **Capturar los empleados** (menú *Nómina → Empleados*), asignando a cada uno su
-   compañía, su departamento y su tipo de contrato. Los campos solicitados cambian
-   según el tipo.
-3. **Calcular el pago de la semana** (menú *Nómina → Calcular pago semanal*):
-   se elige la compañía y la semana, y la pantalla muestra el cálculo propuesto con
-   el desglose de cada empleado. **Nada se ha guardado todavía.**
-4. **Generar el pago.** El documento queda almacenado con la instantánea de lo que
+1. **Capturar los empleados** (menú *Nómina → Empleados*), asignando a cada uno
+   su **entidad gubernamental** del listado oficial, su departamento y su tipo de
+   contrato. Los campos solicitados cambian según el tipo.
+2. **Calcular el pago de la semana** (menú *Nómina → Calcular pago semanal*): se
+   elige la entidad y la semana, y la pantalla muestra el cálculo propuesto con el
+   desglose de cada empleado. **Nada se ha guardado todavía.**
+3. **Generar el pago.** El documento queda almacenado con la instantánea de lo que
    se pagó. Si la semana ya fue pagada, el botón queda deshabilitado y se explica
    por qué.
-5. **Consultar el historial** (menú *Nómina → Historial de pagos*): las nóminas de
+4. **Consultar el historial** (menú *Nómina → Historial de pagos*): las nóminas de
    semanas anteriores, con el detalle de cada una.
+
+El selector de la pantalla de cálculo **no ofrece las 181 entidades del listado**,
+sino las que tienen empleados, con su cantidad de empleados activos. Ofrecer una
+entidad sin empleados solo conduciría a un cálculo vacío que la propia API
+rechaza. El formulario de empleados, en cambio, sí ofrece el listado completo: un
+empleado puede asignarse a cualquier entidad.
 
 ### 7.2 Una semana solo se paga una vez
 
-La regla se aplica en dos niveles independientes:
+La regla se aplica en tres niveles independientes:
 
 | Nivel | Mecanismo |
 |---|---|
 | Interfaz | La vista previa consulta si la semana ya fue pagada y deshabilita el botón antes de que el usuario pueda intentarlo. |
 | Servicio | Comprueba la existencia de una ejecución vigente y responde **HTTP 409** con el identificador de la nómina existente. |
-| Base de datos | Índice único filtrado sobre `(CompanyId, Year, WeekNumber)` para las ejecuciones vigentes. Cierra la ventana de una condición de carrera entre dos peticiones simultáneas. |
+| Base de datos | Índice único filtrado sobre `(GovernmentEntityId, Year, WeekNumber)` para las ejecuciones vigentes. Cierra la ventana de una condición de carrera entre dos peticiones simultáneas. |
 
 Si hay que corregir una semana ya pagada, un **administrador** la anula indicando
 el motivo. El documento se conserva como evidencia y la semana queda libre para
@@ -337,13 +354,23 @@ horas trabajadas de un empleado, la nómina de la semana pasada sigue mostrando 
 que realmente se pagó. Recalcular el histórico con los datos vigentes sería un
 error, no una optimización.
 
+El documento guarda además el **nombre de la entidad gubernamental** al momento
+del pago. Aquí no es solo una decisión de diseño: la entidad vive en el archivo de
+texto plano y ninguna consulta relacional puede unirla con el historial.
+
 ### 7.4 Datos de demostración
 
-En el primer arranque se siembran **3 compañías**, **11 empleados** repartidos
-entre ellas y **24 nóminas históricas** (las 8 semanas anteriores a la actual, por
-cada compañía), con variación determinista de horas y ventas por semana para que
-el historial se parezca a uno real. La semana en curso y la anterior se dejan sin
-generar a propósito, para poder probar el flujo completo.
+En el primer arranque se siembran **11 empleados** repartidos entre **cuatro
+entidades gubernamentales reales del listado oficial** —Dirección General de
+Impuestos Internos, Ministerio de Hacienda y Economía, Oficina Gubernamental de
+Tecnologías de la Información y Comunicación y Superintendencia del Mercado de
+Valores— y **32 nóminas históricas** (las 8 semanas anteriores a la actual, por
+cada entidad), con variación determinista de horas y ventas por semana para que el
+historial se parezca a uno real. Cada nómina histórica queda registrada con la
+fecha en que se habría generado, no con la del sembrado.
+
+La semana en curso se deja sin generar a propósito, para poder probar el flujo
+completo.
 
 ---
 
@@ -355,22 +382,23 @@ Obtener el token:
 curl -X POST http://localhost:5080/api/autenticacion/iniciar-sesion -H "Content-Type: application/json" -d "{\"userName\":\"administrador\",\"password\":\"Sb2024Admin\"}"
 ```
 
-Consultar las compañías para obtener su identificador:
+Consultar las entidades gubernamentales que tienen nómina que calcular, para
+obtener su identificador:
 
 ```bash
-curl -H "Authorization: Bearer <TOKEN>" http://localhost:5080/api/companias
+curl -H "Authorization: Bearer <TOKEN>" http://localhost:5080/api/nomina/entidades
 ```
 
 Ver el cálculo propuesto de una semana, sin guardarlo:
 
 ```bash
-curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/nomina/vista-previa?companyId=<GUID>&year=2026&weekNumber=34"
+curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/nomina/vista-previa?governmentEntityId=<GUID>&year=2026&weekNumber=35"
 ```
 
 Generar el pago de esa semana:
 
 ```bash
-curl -X POST http://localhost:5080/api/nomina/ejecuciones -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"companyId\":\"<GUID>\",\"year\":2026,\"weekNumber\":34,\"onlyActiveEmployees\":true}"
+curl -X POST http://localhost:5080/api/nomina/ejecuciones -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"governmentEntityId\":\"<GUID>\",\"year\":2026,\"weekNumber\":35,\"onlyActiveEmployees\":true}"
 ```
 
 Intentarlo de nuevo devuelve **HTTP 409** con el identificador de la nómina que ya
@@ -380,18 +408,18 @@ existe:
 {
   "title": "La semana ya tiene nomina generada.",
   "status": 409,
-  "detail": "La compania 'Servicios Financieros del Caribe, S. A.' ya tiene la nomina de la semana 34 del ano 2026 generada. Una semana solo puede pagarse una vez; anule la ejecucion existente si necesita volver a calcularla.",
+  "detail": "La entidad gubernamental 'Direccion General de Impuestos Internos' ya tiene la nomina de la semana 35 del ano 2026 generada. Una semana solo puede pagarse una vez; anule la ejecucion existente si necesita volver a calcularla.",
   "errorCode": "NOMINA_SEMANA_YA_GENERADA",
-  "existingPayrollRunId": "fe49a02d-566e-4036-a8ea-8946c83b418e",
+  "existingPayrollRunId": "3678908e-95b0-4026-980b-1ccbc81f3fca",
   "payrollYear": 2026,
-  "payrollWeekNumber": 34
+  "payrollWeekNumber": 35
 }
 ```
 
 Registrar un empleado por horas (el pago se calcula como `300 × 40 + 300 × 1.5 × 5`):
 
 ```bash
-curl -X POST http://localhost:5080/api/empleados -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"type\":\"Hourly\",\"paternalLastName\":\"Diaz\",\"socialSecurityNumber\":\"001-9999999-9\",\"companyId\":\"<GUID>\",\"departmentId\":\"<GUID>\",\"status\":\"Active\",\"hourlyWage\":300,\"hoursWorked\":45}"
+curl -X POST http://localhost:5080/api/empleados -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"type\":\"Hourly\",\"paternalLastName\":\"Diaz\",\"socialSecurityNumber\":\"001-9999999-9\",\"governmentEntityId\":\"<GUID>\",\"departmentId\":\"<GUID>\",\"status\":\"Active\",\"hourlyWage\":300,\"hoursWorked\":45}"
 ```
 
 Respuesta (fragmento):
@@ -415,6 +443,8 @@ Consultar el registro de eventos (solo administrador):
 ```bash
 curl -H "Authorization: Bearer <TOKEN>" "http://localhost:5080/api/registro-eventos?minimumLevel=Warning&maximumEntries=50"
 ```
+
+---
 
 ## 9. Reglas de cálculo de nómina
 
@@ -505,4 +535,6 @@ correlación** que también se devuelve al cliente en las respuestas de error.
 - La base de datos de texto plano generada (`GovernmentEntities.txt`) está
   excluida del control de versiones; el archivo semilla
   (`GovernmentEntities.seed.txt`), que sí está versionado, es la fuente de verdad
-  y permite clonar y ejecutar sin pasos manuales.
+  y permite clonar y ejecutar sin pasos manuales. Como los identificadores se
+  derivan del nombre de cada entidad, regenerar el archivo produce exactamente el
+  mismo contenido y no rompe ninguna referencia.

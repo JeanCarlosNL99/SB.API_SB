@@ -5,12 +5,12 @@ import {
 } from '@/constants/employeeTypes';
 import { ErrorMessage } from './Feedback';
 import type {
-  Company,
   Department,
   Employee,
   EmployeeRequest,
   EmployeeStatus,
   EmployeeType,
+  GovernmentEntityOption,
 } from '@/types/api';
 
 const SOCIAL_SECURITY_NUMBER_PATTERN = /^[0-9A-Za-z-]+$/;
@@ -31,7 +31,7 @@ type FormValues = Record<string, string> & {
  */
 export function EmployeeForm({
   employee,
-  companies,
+  governmentEntities,
   departments,
   isSubmitting,
   submitError,
@@ -39,7 +39,7 @@ export function EmployeeForm({
   onCancel,
 }: {
   employee?: Employee | null;
-  companies: Company[];
+  governmentEntities: GovernmentEntityOption[];
   departments: Department[];
   isSubmitting: boolean;
   submitError: unknown;
@@ -61,11 +61,6 @@ export function EmployeeForm({
   const activeDepartments = useMemo(
     () => departments.filter((department) => department.isActive),
     [departments],
-  );
-
-  const activeCompanies = useMemo(
-    () => companies.filter((company) => company.isActive),
-    [companies],
   );
 
   function updateValue(key: string, value: string) {
@@ -112,7 +107,7 @@ export function EmployeeForm({
                 firstName: previousValues.firstName,
                 paternalLastName: previousValues.paternalLastName,
                 socialSecurityNumber: previousValues.socialSecurityNumber,
-                companyId: previousValues.companyId,
+                governmentEntityId: previousValues.governmentEntityId,
                 departmentId: previousValues.departmentId,
               }));
             }}
@@ -173,27 +168,27 @@ export function EmployeeForm({
         />
 
         <div className="field">
-          <label className="field__label" htmlFor="companyId">
-            Compania
+          <label className="field__label" htmlFor="governmentEntityId">
+            Entidad gubernamental
           </label>
           <select
-            id="companyId"
-            className={`control${validationErrors.companyId ? ' control--invalid' : ''}`}
-            value={values.companyId}
-            onChange={(changeEvent) => updateValue('companyId', changeEvent.target.value)}
+            id="governmentEntityId"
+            className={`control${validationErrors.governmentEntityId ? ' control--invalid' : ''}`}
+            value={values.governmentEntityId}
+            onChange={(changeEvent) => updateValue('governmentEntityId', changeEvent.target.value)}
           >
-            <option value="">Seleccione una compania</option>
-            {activeCompanies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
+            <option value="">Seleccione una entidad gubernamental</option>
+            {governmentEntities.map((governmentEntity) => (
+              <option key={governmentEntity.id} value={governmentEntity.id}>
+                {governmentEntity.name}
               </option>
             ))}
           </select>
           <span className="field__hint">
-            La nomina del empleado se calcula con la de su compania.
+            El pago semanal del empleado se calcula con la nomina de su entidad.
           </span>
-          {validationErrors.companyId && (
-            <span className="field__error">{validationErrors.companyId}</span>
+          {validationErrors.governmentEntityId && (
+            <span className="field__error">{validationErrors.governmentEntityId}</span>
           )}
         </div>
 
@@ -321,7 +316,7 @@ function buildInitialValues(employee: Employee | null | undefined): FormValues {
     type: employee?.type ?? 'Salaried',
     status: employee?.status ?? 'Active',
     firstName: employee?.firstName ?? '',
-    companyId: employee?.companyId ?? '',
+    governmentEntityId: employee?.governmentEntityId ?? '',
     paternalLastName: employee?.paternalLastName ?? '',
     socialSecurityNumber: employee?.socialSecurityNumber ?? '',
     departmentId: employee?.departmentId ?? '',
@@ -360,8 +355,8 @@ function validate(
     errors.socialSecurityNumber = 'Solo admite letras, numeros y guiones.';
   }
 
-  if (values.companyId.length === 0) {
-    errors.companyId = 'Seleccione una compania.';
+  if (values.governmentEntityId.length === 0) {
+    errors.governmentEntityId = 'Seleccione una entidad gubernamental.';
   }
 
   if (values.departmentId.length === 0) {
@@ -407,7 +402,7 @@ function buildRequest(
     firstName: values.firstName.trim().length > 0 ? values.firstName.trim() : null,
     paternalLastName: values.paternalLastName.trim(),
     socialSecurityNumber: values.socialSecurityNumber.trim(),
-    companyId: values.companyId,
+    governmentEntityId: values.governmentEntityId,
     departmentId: values.departmentId,
     status: values.status,
   };

@@ -26,11 +26,12 @@ Adjunto el enlace al repositorio con la solución de la prueba técnica y, a
 continuación, las respuestas a las preguntas de conceptualización.
 
 La solución incluye la API RESTful en .NET 8 con arquitectura Onion, el portal
-web en React con TypeScript, el mantenimiento de las 181 entidades
-gubernamentales sobre archivo de texto plano, el módulo de empleados con cálculo
-de nómina para los cuatro tipos de contrato, la gestión de usuarios con
-autenticación JWT y 77 pruebas unitarias. El archivo `README.md` contiene las
-instrucciones de ejecución y `docs/REPORTE-TECNICO.md` el detalle de las
+web en React con TypeScript, la consulta de las 181 entidades gubernamentales
+sobre archivo de texto plano, el módulo de empleados —asociados a las entidades
+de ese listado— con cálculo de nómina para los cuatro tipos de contrato, el
+cálculo de pagos semanales por entidad con su historial, la gestión de usuarios
+con autenticación JWT y 107 pruebas unitarias. El archivo `README.md` contiene
+las instrucciones de ejecución y `docs/REPORTE-TECNICO.md` el detalle de las
 decisiones de diseño.
 
 ---
